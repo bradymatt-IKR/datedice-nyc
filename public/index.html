@@ -13,10 +13,50 @@
     *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;margin:0;padding:0}
     body{background:#0c0c18;color:#f0ece2;font-family:'Georgia','Palatino Linotype',serif;overflow-x:hidden}
     ::-webkit-scrollbar{width:4px}::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.1);border-radius:4px}
-    @keyframes diceShake{0%{transform:translate(0,0) rotate(0deg)}25%{transform:translate(-3px,2px) rotate(-5deg)}50%{transform:translate(3px,-2px) rotate(5deg)}75%{transform:translate(-2px,-3px) rotate(-3deg)}100%{transform:translate(2px,3px) rotate(3deg)}}
     @keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
     @keyframes pulse{0%,100%{opacity:0.5}50%{opacity:1}}
+    @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+    /* ── 3D DICE ANIMATIONS ── */
+    @keyframes diceRotate{
+      0%  {transform:rotateX(0deg) rotateY(0deg) rotateZ(0deg)}
+      100%{transform:rotateX(720deg) rotateY(460deg) rotateZ(200deg)}
+    }
+    @keyframes diceFloat{
+      from{transform:translateY(0px)}
+      to  {transform:translateY(-16px)}
+    }
+    @keyframes diceSettle{
+      0%  {transform:rotateX(360deg) rotateY(230deg) rotateZ(100deg)}
+      42% {transform:rotateX(7deg)   rotateY(-5deg)  rotateZ(1.5deg)}
+      58% {transform:rotateX(-4deg)  rotateY(2.5deg) rotateZ(-0.8deg)}
+      72% {transform:rotateX(2deg)   rotateY(-1.2deg) rotateZ(0.3deg)}
+      84% {transform:rotateX(-0.9deg) rotateY(0.5deg) rotateZ(0deg)}
+      93% {transform:rotateX(0.4deg) rotateY(-0.2deg) rotateZ(0deg)}
+      100%{transform:rotateX(0deg)   rotateY(0deg)   rotateZ(0deg)}
+    }
     #root{min-height:100vh}
+
+    /* ── DESKTOP LAYOUT ── */
+    @media(min-width:768px){
+      .app-shell{display:grid;grid-template-columns:220px 1fr;min-height:100vh;max-width:1100px;margin:0 auto;}
+      .side-nav{position:fixed;top:0;left:50%;transform:translateX(-550px);width:220px;height:100vh;display:flex;flex-direction:column;padding:32px 16px;border-right:1px solid rgba(255,255,255,0.06);background:rgba(12,12,24,0.95);backdrop-filter:blur(20px);}
+      .side-nav-logo{font-size:32px;margin-bottom:8px;text-align:center;}
+      .side-nav-title{font-family:'Georgia',serif;font-size:22px;color:#e8c36a;text-align:center;margin-bottom:4px;background:linear-gradient(135deg,#e8c36a,#c97d4a);-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+      .side-nav-sub{font-family:'Helvetica Neue',sans-serif;font-size:11px;color:rgba(240,236,226,0.4);text-align:center;letter-spacing:0.15em;text-transform:uppercase;margin-bottom:32px;}
+      .side-nav-btn{display:flex;align-items:center;gap:12px;padding:12px 16px;border-radius:12px;border:none;background:transparent;color:rgba(240,236,226,0.5);font-family:'Helvetica Neue',sans-serif;font-size:14px;cursor:pointer;width:100%;text-align:left;transition:all 0.2s;margin-bottom:4px;position:relative;}
+      .side-nav-btn.active{background:rgba(232,195,106,0.12);color:#e8c36a;}
+      .side-nav-btn:hover:not(.active){background:rgba(255,255,255,0.04);color:rgba(240,236,226,0.8);}
+      .side-nav-btn .nav-icon{font-size:18px;}
+      .side-nav-badge{position:absolute;right:12px;top:50%;transform:translateY(-50%);background:#d4727e;color:#fff;font-size:10px;font-weight:700;border-radius:50%;width:18px;height:18px;display:flex;align-items:center;justify-content:center;}
+      .main-content{margin-left:220px;padding:40px 48px 60px;max-width:680px;}
+      .bottom-nav{display:none !important;}
+      .roll-btn-sticky{display:none;}
+    }
+    @media(max-width:767px){
+      .app-shell{display:block;}
+      .side-nav{display:none;}
+      .main-content{padding:24px 20px 100px;}
+    }
   </style>
 </head>
 <body>
@@ -56,7 +96,7 @@ function classifyWeather(tempF,code,humidity,wind){
 }
 function weatherToFilter(c){return{Sunny:"Sunny",Hot:"Hot",Mild:"Sunny","Partly Cloudy":"Cloudy",Cloudy:"Cloudy",Windy:"Windy",Foggy:"Cloudy",Rainy:"Rainy",Stormy:"Rainy",Snowy:"Snowy",Cold:"Cold",Frigid:"Cold"}[c]||"Any Weather";}
 
-// ── STORAGE (localStorage for standalone) ──
+// ── STORAGE ──
 function loadData(key,fallback){try{const v=localStorage.getItem(key);return v?JSON.parse(v):fallback||[];}catch{return fallback||[];}}
 function saveData(key,val){try{localStorage.setItem(key,JSON.stringify(val));}catch(e){console.error(e);}}
 
@@ -124,13 +164,109 @@ function Btn({children,primary,small,disabled,style,...props}){
 const Chip=({active,children,onClick,small})=>(
   <button onClick={onClick} style={{background:active?P.grad:P.card,color:active?"#1a1a2e":P.text,border:"1px solid "+(active?"transparent":P.border),padding:small?"7px 12px":"10px 18px",borderRadius:"24px",fontSize:small?"12px":"14px",fontWeight:active?"700":"400",fontFamily:sans,cursor:"pointer",transition:"all 0.2s"}}>{children}</button>
 );
-const DiceFace=({value,size})=>{
-  const s=size||64;
-  const dots={1:[[50,50]],2:[[28,28],[72,72]],3:[[28,28],[50,50],[72,72]],4:[[28,28],[72,28],[28,72],[72,72]],5:[[28,28],[72,28],[50,50],[28,72],[72,72]],6:[[28,28],[72,28],[28,50],[72,50],[28,72],[72,72]]};
-  return(<svg width={s} height={s} viewBox="0 0 100 100"><rect x="2" y="2" width="96" height="96" rx="16" fill="rgba(255,248,235,0.95)" stroke="rgba(180,140,60,0.35)" strokeWidth="2"/>{(dots[value]||dots[1]).map(function(p,i){return <circle key={i} cx={p[0]} cy={p[1]} r="8.5" fill="#1a1a2e"/>;})}</svg>);
+// ── 3D DICE ──
+const DICE_DOTS={
+  1:[[50,50]],
+  2:[[33,33],[67,67]],
+  3:[[33,33],[50,50],[67,67]],
+  4:[[33,33],[67,33],[33,67],[67,67]],
+  5:[[33,33],[67,33],[50,50],[33,67],[67,67]],
+  6:[[33,25],[67,25],[33,50],[67,50],[33,75],[67,75]],
 };
+function Dice3D({value,rolling,size}){
+  const s=size||80;
+  const h=s/2;
+  const[phase,setPhase]=useState('idle');
+  const prevRolling=useRef(false);
+  const timerRef=useRef(null);
+
+  useEffect(function(){
+    if(rolling&&!prevRolling.current){
+      if(timerRef.current)clearTimeout(timerRef.current);
+      setPhase('rolling');
+    } else if(!rolling&&prevRolling.current){
+      if(timerRef.current)clearTimeout(timerRef.current);
+      setPhase('settling');
+      timerRef.current=setTimeout(function(){setPhase('idle');},1200);
+    }
+    prevRolling.current=rolling;
+    return function(){if(timerRef.current)clearTimeout(timerRef.current);};
+  },[rolling]);
+
+  const front=value||1,back=7-front;
+  const sides=[1,2,3,4,5,6].filter(function(x){return x!==front&&x!==back;});
+  const faces={front,back,right:sides[0],left:sides[1],top:sides[2],bottom:sides[3]};
+
+  function DiceFaceSVG({v}){
+    return(
+      <svg viewBox="0 0 100 100" width={s} height={s} style={{display:'block'}}>
+        <defs>
+          <linearGradient id={"dg"+v} x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="rgba(255,253,235,1)"/>
+            <stop offset="100%" stopColor="rgba(242,230,195,1)"/>
+          </linearGradient>
+        </defs>
+        <rect x="3" y="3" width="94" height="94" rx="19" fill={"url(#dg"+v+")"} stroke="rgba(190,148,58,0.3)" strokeWidth="1.5"/>
+        {(DICE_DOTS[v]||DICE_DOTS[1]).map(function(p,i){return(
+          <g key={i}>
+            <circle cx={p[0]} cy={p[1]+1} r="9" fill="rgba(0,0,0,0.18)"/>
+            <circle cx={p[0]} cy={p[1]} r="9" fill="#1b1408"/>
+          </g>
+        );})}
+      </svg>
+    );
+  }
+
+  const fb={position:'absolute',width:s,height:s,backfaceVisibility:'hidden',WebkitBackfaceVisibility:'hidden'};
+
+  const cubeAnim=phase==='rolling'?'diceRotate 0.65s linear infinite':phase==='settling'?'diceSettle 1.15s cubic-bezier(0.12,0,0.2,1) forwards':'none';
+  const cubeTransform=(phase==='rolling'||phase==='settling')?undefined:'rotateX(0deg) rotateY(0deg)';
+  const floatAnim=phase==='rolling'?'diceFloat 0.38s ease-in-out infinite alternate':'none';
+  const floatTransform=phase==='rolling'?undefined:'translateY(0px)';
+
+  return(
+    <div style={{width:s,height:s,position:'relative'}}>
+      {/* settled glow */}
+      <div style={{position:'absolute',bottom:'-6px',left:'50%',transform:'translateX(-50%)',width:s*0.75,height:'10px',background:'radial-gradient(ellipse, rgba(232,195,106,0.5) 0%, transparent 70%)',borderRadius:'50%',opacity:phase==='idle'?1:0,transition:'opacity 0.5s'}}/>
+      {/* float wrapper */}
+      <div style={{width:s,height:s,animation:floatAnim,transform:floatTransform,transition:phase!=='rolling'?'transform 0.35s ease-out':undefined}}>
+        <div style={{width:s,height:s,perspective:s*4}}>
+          <div style={{width:s,height:s,position:'relative',transformStyle:'preserve-3d',animation:cubeAnim,transform:cubeTransform}}>
+            <div style={Object.assign({},fb,{transform:'translateZ('+h+'px)'})}><DiceFaceSVG v={faces.front}/></div>
+            <div style={Object.assign({},fb,{transform:'rotateY(180deg) translateZ('+h+'px)'})}><DiceFaceSVG v={faces.back}/></div>
+            <div style={Object.assign({},fb,{transform:'rotateY(90deg) translateZ('+h+'px)'})}><DiceFaceSVG v={faces.right}/></div>
+            <div style={Object.assign({},fb,{transform:'rotateY(-90deg) translateZ('+h+'px)'})}><DiceFaceSVG v={faces.left}/></div>
+            <div style={Object.assign({},fb,{transform:'rotateX(90deg) translateZ('+h+'px)'})}><DiceFaceSVG v={faces.top}/></div>
+            <div style={Object.assign({},fb,{transform:'rotateX(-90deg) translateZ('+h+'px)'})}><DiceFaceSVG v={faces.bottom}/></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── SIDE NAV (desktop) ──
+const SideNav=({tab,setTab,historyCount})=>(
+  <div className="side-nav">
+    <div className="side-nav-logo">🎲</div>
+    <div className="side-nav-title">Date Dice</div>
+    <div className="side-nav-sub">New York City</div>
+    {[{id:"roll",icon:"🎲",label:"Roll the Dice"},{id:"discover",icon:"🔍",label:"Discover"},{id:"calendar",icon:"📅",label:"My Dates"}].map(function(t){return(
+      <button key={t.id} className={"side-nav-btn"+(tab===t.id?" active":"")} onClick={function(){setTab(t.id);}}>
+        <span className="nav-icon">{t.icon}</span>
+        <span>{t.label}</span>
+        {t.id==="calendar"&&historyCount>0&&<span className="side-nav-badge">{historyCount}</span>}
+      </button>
+    );})}
+    <div style={{marginTop:"auto",padding:"16px 0 0"}}>
+      <div style={{fontSize:"11px",color:P.textDim,fontFamily:sans,lineHeight:1.6}}>Roll the dice.<br/>Let NYC surprise you.</div>
+    </div>
+  </div>
+);
+
+// ── BOTTOM NAV (mobile) ──
 const NavBar=({tab,setTab,historyCount})=>(
-  <div style={{position:"fixed",bottom:0,left:0,right:0,zIndex:100,background:"linear-gradient(transparent, "+P.bg+" 20%)",paddingTop:"28px"}}>
+  <div className="bottom-nav" style={{position:"fixed",bottom:0,left:0,right:0,zIndex:100,background:"linear-gradient(transparent, "+P.bg+" 20%)",paddingTop:"28px"}}>
     <div style={{display:"flex",justifyContent:"center",gap:"4px",background:"rgba(15,15,28,0.92)",backdropFilter:"blur(20px)",borderTop:"1px solid "+P.border,padding:"8px 12px 12px",maxWidth:"480px",margin:"0 auto",borderRadius:"20px 20px 0 0"}}>
       {[{id:"roll",icon:"🎲",label:"Roll"},{id:"discover",icon:"🔍",label:"Discover"},{id:"calendar",icon:"📅",label:"My Dates"}].map(function(t){return(
         <button key={t.id} onClick={function(){setTab(t.id);}} style={{flex:1,background:tab===t.id?P.goldDim:"transparent",border:"none",borderRadius:"12px",padding:"8px 4px",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:"2px"}}>
@@ -141,6 +277,7 @@ const NavBar=({tab,setTab,historyCount})=>(
     </div>
   </div>
 );
+
 const WeatherBadge=({weather,loading})=>{
   if(loading)return<div style={{display:"flex",alignItems:"center",gap:"8px",padding:"12px 16px",borderRadius:"14px",background:P.card,border:"1px solid "+P.border,marginBottom:"20px"}}><span style={{fontSize:"20px",animation:"pulse 1s infinite"}}>🌐</span><span style={{fontFamily:sans,fontSize:"13px",color:P.textDim}}>Fetching live NYC weather...</span></div>;
   if(!weather)return null;
@@ -153,6 +290,7 @@ const WeatherBadge=({weather,loading})=>{
     </div>
   </div>);
 };
+
 const MiniCalendar=({history})=>{
   const[vd,setVd]=useState(new Date());
   const y=vd.getFullYear(),m=vd.getMonth(),fd=new Date(y,m,1).getDay(),dim=new Date(y,m+1,0).getDate(),today=new Date();
@@ -169,7 +307,7 @@ const MiniCalendar=({history})=>{
 };
 
 // ── RESULT CARD ──
-const ResultCard=({result,onReroll,onLockIn,onShare,locked,rolling:isRolling})=>(
+const ResultCard=({result,onReroll,onLockIn,onShare,locked,rolling:isRolling,altsLoading})=>(
   <div style={{animation:"fadeUp 0.6s ease both"}}>
     <div style={{background:"linear-gradient(135deg, rgba(232,195,106,0.08), rgba(201,125,74,0.08))",border:"1px solid rgba(232,195,106,0.2)",borderRadius:"20px",padding:"28px 24px",marginBottom:"16px"}}>
       <div style={{fontSize:"44px",marginBottom:"10px"}}>{result.emoji||"🎲"}</div>
@@ -190,6 +328,7 @@ const ResultCard=({result,onReroll,onLockIn,onShare,locked,rolling:isRolling})=>
       <Btn small onClick={function(){window.open("https://www.google.com/search?q="+encodeURIComponent(result.name+(result.address?" "+result.address:" NYC")),"_blank");}} style={{flex:"1 1 auto",fontSize:"12px"}}>🔎 Look Up</Btn>
       <Btn small onClick={function(){const now=new Date(),s=new Date(now),e=new Date(now);s.setHours(19,0,0,0);e.setHours(22,0,0,0);const fmt=function(d){return d.toISOString().replace(/[-:]/g,"").replace(/\.\d+/,"");};window.open("https://calendar.google.com/calendar/render?action=TEMPLATE&text="+encodeURIComponent("Date Night: "+result.name)+"&dates="+fmt(s)+"/"+fmt(e)+"&details="+encodeURIComponent(result.desc+(result.tip?"\n\nTip: "+result.tip:""))+"&location="+encodeURIComponent((result.address||result.area)+", New York, NY"),"_blank");}} style={{flex:"1 1 auto",fontSize:"12px"}}>📅 Google Cal</Btn>
     </div>
+    {altsLoading&&<div style={{marginTop:"12px",display:"flex",alignItems:"center",gap:"8px",padding:"10px 14px",borderRadius:"12px",background:P.card,border:"1px solid "+P.border}}><span style={{fontSize:"14px",animation:"spin 1s linear infinite",display:"inline-block"}}>⟳</span><span style={{fontFamily:sans,fontSize:"12px",color:P.textDim}}>Loading alternate picks...</span></div>}
   </div>
 );
 
@@ -228,6 +367,7 @@ function DateDice(){
   const[subScreen,setSubScreen]=useState("filters");
   const[filters,setFilters]=useState({});
   const[rolling,setRolling]=useState(false);
+  const[altsLoading,setAltsLoading]=useState(false);
   const[diceVals,setDiceVals]=useState([3,5]);
   const[result,setResult]=useState(null);
   const[altResults,setAltResults]=useState([]);
@@ -242,6 +382,7 @@ function DateDice(){
   const[showCuisines,setShowCuisines]=useState(false);
   const[showActivityTypes,setShowActivityTypes]=useState(false);
   const diceInterval=useRef(null);
+  const rollCount=useRef(0); // track roll generation to avoid stale async updates
 
   useEffect(function(){setHistory(loadData("datedice:history",[]));setUsedNames(loadData("datedice:used",[]));;},[]);
   useEffect(function(){
@@ -255,42 +396,87 @@ function DateDice(){
     }catch(e){console.error(e);}setWeatherLoading(false);})();
   },[]);
 
+  // Cleanup interval on unmount
+  useEffect(function(){return function(){if(diceInterval.current)clearInterval(diceInterval.current);};},[]);
+
   const showToast=function(msg){setToast(msg);setTimeout(function(){setToast(null);},2500);};
 
   const doRoll=useCallback(async function(){
-    setRolling(true);setResult(null);setAltResults([]);setShowAlts(false);setLocked(false);
+    // Cancel any in-flight interval from a previous roll
+    if(diceInterval.current){clearInterval(diceInterval.current);diceInterval.current=null;}
+
+    // Increment roll generation counter to invalidate stale async results
+    rollCount.current+=1;
+    const thisRoll=rollCount.current;
+
+    setRolling(true);setResult(null);setAltResults([]);setShowAlts(false);setLocked(false);setAltsLoading(false);
+
+    // Start dice animation
     diceInterval.current=setInterval(function(){setDiceVals([Math.ceil(Math.random()*6),Math.ceil(Math.random()*6)]);},100);
+
     const cat=filters.category||"Surprise Me";
     let type;
     if(cat==="Food & Drink")type="food";
     else if(cat==="Activities")type="activity";
     else type=Math.random()>0.45?"food":"activity";
+
+    // Capture used names at time of roll (stable ref for this roll's async work)
+    const currentUsed=[...usedNames];
+
     try{
-      const results=await fetchMultiple(type,filters,3,usedNames);
-      clearInterval(diceInterval.current);
+      // ── FAST PATH: fetch 1 result and show it immediately ──
+      const firstResult=await fetchSuggestion(type,filters,currentUsed);
+
+      // Bail if a newer roll has started
+      if(rollCount.current!==thisRoll)return;
+
+      clearInterval(diceInterval.current);diceInterval.current=null;
       setDiceVals([Math.ceil(Math.random()*6),Math.ceil(Math.random()*6)]);
-      if(results.length>0){
-        setResult(results[0]);setAltResults(results.slice(1));
-        const newUsed=usedNames.concat(results.map(function(r){return r.name;}));
-        setUsedNames(newUsed);saveData("datedice:used",newUsed.slice(-200));
+      setRolling(false);
+
+      if(firstResult&&firstResult.name){
+        setResult(firstResult);
+        const updatedUsed=currentUsed.concat([firstResult.name]);
+
+        // Update global used-names state
+        setUsedNames(updatedUsed);
+        saveData("datedice:used",updatedUsed.slice(-200));
+
+        // ── BACKGROUND: fetch 2 alternates without blocking UI ──
+        setAltsLoading(true);
+        fetchMultiple(type,filters,2,updatedUsed).then(function(alts){
+          if(rollCount.current!==thisRoll)return; // stale, discard
+          setAltResults(alts);
+          setAltsLoading(false);
+          if(alts.length>0){
+            setUsedNames(function(prev){
+              const next=prev.concat(alts.map(function(r){return r.name;}));
+              saveData("datedice:used",next.slice(-200));
+              return next;
+            });
+          }
+        }).catch(function(){
+          if(rollCount.current===thisRoll)setAltsLoading(false);
+        });
       } else {
         setResult({name:"Couldn't find a match",desc:"Try adjusting your filters or being less specific — the city has endless options!",emoji:"🤔",cat:"Oops",area:"NYC"});
       }
     }catch(err){
-      console.error(err);clearInterval(diceInterval.current);
+      if(rollCount.current!==thisRoll)return;
+      console.error(err);
+      if(diceInterval.current){clearInterval(diceInterval.current);diceInterval.current=null;}
+      setRolling(false);
       setResult({name:"Something went wrong",desc:"The search didn't come back. Try rolling again!",emoji:"😅",cat:"Error",area:"NYC"});
     }
-    setRolling(false);
   },[filters,usedNames]);
-
-  useEffect(function(){return function(){if(diceInterval.current)clearInterval(diceInterval.current);};},[]);
 
   const lockIn=function(item){const entry=Object.assign({},item,{id:Date.now().toString(),status:"locked",lockedAt:new Date().toISOString(),rating:null});const next=[entry].concat(history);setHistory(next);saveData("datedice:history",next);setLocked(true);showToast("🔒 Locked in! It's a date.");};
   const markComplete=function(id,rating){const next=history.map(function(h){return h.id===id?Object.assign({},h,{status:"completed",completedAt:new Date().toISOString(),rating:rating}):h;});setHistory(next);saveData("datedice:history",next);showToast("✓ Date completed!");};
   const removeEntry=function(id){const next=history.filter(function(h){return h.id!==id;});setHistory(next);saveData("datedice:history",next);showToast("Removed.");};
   const sharePlan=function(item){const text="🎲 Date Dice picked:\n\n"+(item.emoji||"🎲")+" "+item.name+"\n📍 "+item.area+(item.address&&item.address!==item.area?"\n📫 "+item.address:"")+"\n\n"+item.desc+(item.tip?"\n\n💡 "+item.tip:"")+"\n\nLet's do this! 💛";navigator.clipboard.writeText(text).then(function(){showToast("📋 Copied to clipboard!");}).catch(function(){showToast("Couldn't copy — try long-press");});};
 
-  const filtersSelected=Object.values(filters).filter(Boolean).length;
+  const handleTabChange=function(t){setTab(t);if(t==="roll")setSubScreen("filters");};
+
   const pageStyle={minHeight:"100vh",background:"radial-gradient(ellipse at 20% 0%,rgba(232,195,106,0.05) 0%,transparent 50%),radial-gradient(ellipse at 80% 100%,rgba(201,125,74,0.05) 0%,transparent 50%),"+P.bg,color:P.text,fontFamily:serif};
 
   if(screen==="home"){
@@ -307,140 +493,152 @@ function DateDice(){
     </div></div>);
   }
 
+  // ── Filters label for the roll button ──
+  const activeFilterCount=Object.values(filters).filter(Boolean).length;
+
   return(<div style={pageStyle}>
     {toast&&<div style={{position:"fixed",top:"16px",left:"50%",transform:"translateX(-50%)",zIndex:200,background:"rgba(15,15,28,0.95)",border:"1px solid "+P.goldDim,borderRadius:"14px",padding:"12px 24px",fontFamily:sans,fontSize:"14px",color:P.gold,boxShadow:"0 8px 32px rgba(0,0,0,0.4)",animation:"fadeUp 0.3s ease",backdropFilter:"blur(12px)"}}>{toast}</div>}
-    <div style={{maxWidth:"540px",margin:"0 auto",padding:"24px 20px 100px"}}>
 
-      {tab==="roll"&&subScreen==="filters"&&(<div>
-        <h2 style={{fontSize:"26px",fontWeight:"400",margin:"0 0 4px",color:P.gold}}>Set the Scene</h2>
-        <p style={{fontSize:"13px",color:P.textDim,margin:"0 0 20px",fontFamily:sans}}>Pick what matters — skip what doesn't</p>
-        <WeatherBadge weather={weather} loading={weatherLoading}/>
-        {Object.entries(FILTERS_MAIN).map(function([key,cfg]){return(
-          <div key={key} style={{marginBottom:"22px"}}>
-            <div style={{fontSize:"12px",color:P.textDim,textTransform:"uppercase",letterSpacing:"0.15em",marginBottom:"8px",fontFamily:sans}}>
-              {cfg.icon} {cfg.label}
-              {key==="budget"&&<span style={{color:P.accent,marginLeft:"6px",textTransform:"none",letterSpacing:"0",fontSize:"11px"}}>($150–300 = upscale · Splurge = $300+)</span>}
-            </div>
-            <div style={{display:"flex",flexWrap:"wrap",gap:"8px"}}>
-              {cfg.options.map(function(opt){return <Chip key={opt} active={filters[key]===opt} onClick={function(){setFilters(function(f){const n=Object.assign({},f);if(n[key]===opt)delete n[key];else n[key]=opt;return n;});}}>{opt}</Chip>;})}
-            </div>
-          </div>
-        );})}
+    <div className="app-shell">
+      {/* Desktop side nav */}
+      <SideNav tab={tab} setTab={handleTabChange} historyCount={history.filter(function(h){return h.status==="locked";}).length}/>
 
-        {/* Neighborhood */}
-        <div style={{marginBottom:"22px"}}>
-          <button onClick={function(){setShowNeighborhoods(!showNeighborhoods);}} style={{background:"none",border:"none",padding:0,cursor:"pointer",display:"flex",alignItems:"center",gap:"6px",marginBottom:"8px",width:"100%"}}>
-            <span style={{fontSize:"12px",color:P.textDim,textTransform:"uppercase",letterSpacing:"0.15em",fontFamily:sans}}>📍 Neighborhood</span>
-            {filters.neighborhood&&<span style={{fontSize:"12px",color:P.gold,fontFamily:sans}}>· {filters.neighborhood}</span>}
-            <span style={{fontSize:"10px",color:P.textDim,marginLeft:"auto"}}>{showNeighborhoods?"▴":"▾"}</span>
-          </button>
-          {showNeighborhoods&&(<div>
-            {filters.neighborhood&&<div style={{marginBottom:"8px"}}><Chip small active onClick={function(){setFilters(function(f){const n=Object.assign({},f);delete n.neighborhood;return n;});;}}>✕ Clear</Chip></div>}
-            {Object.entries(NEIGHBORHOODS).map(function([borough,hoods]){return(
-              <div key={borough} style={{marginTop:"10px"}}>
-                <div style={{fontSize:"11px",color:P.accent,fontFamily:sans,fontWeight:"700",marginBottom:"6px"}}>{borough}</div>
-                <div style={{display:"flex",flexWrap:"wrap",gap:"6px"}}>
-                  {hoods.map(function(h){return <Chip key={h} small active={filters.neighborhood===h} onClick={function(){setFilters(function(f){const n=Object.assign({},f);if(n.neighborhood===h)delete n.neighborhood;else n.neighborhood=h;return n;});}}>{h}</Chip>;})}
-                </div>
-              </div>);})}
-          </div>)}
-        </div>
+      {/* Main content */}
+      <div className="main-content">
 
-        {/* Cuisine */}
-        {(filters.category==="Food & Drink"||!filters.category||filters.category==="Surprise Me")&&(
-          <div style={{marginBottom:"22px"}}>
-            <button onClick={function(){setShowCuisines(!showCuisines);}} style={{background:"none",border:"none",padding:0,cursor:"pointer",display:"flex",alignItems:"center",gap:"6px",marginBottom:"8px",width:"100%"}}>
-              <span style={{fontSize:"12px",color:P.textDim,textTransform:"uppercase",letterSpacing:"0.15em",fontFamily:sans}}>🍽 Cuisine</span>
-              {filters.cuisine&&<span style={{fontSize:"12px",color:P.gold,fontFamily:sans}}>· {filters.cuisine}</span>}
-              <span style={{fontSize:"10px",color:P.textDim,marginLeft:"auto"}}>{showCuisines?"▴":"▾"}</span>
-            </button>
-            {showCuisines&&(<div>
-              {filters.cuisine&&<div style={{marginBottom:"8px"}}><Chip small active onClick={function(){setFilters(function(f){const n=Object.assign({},f);delete n.cuisine;return n;});}}>✕ Clear</Chip></div>}
-              <div style={{display:"flex",flexWrap:"wrap",gap:"6px"}}>{CUISINES.map(function(c){return <Chip key={c} small active={filters.cuisine===c} onClick={function(){setFilters(function(f){const n=Object.assign({},f);if(n.cuisine===c)delete n.cuisine;else n.cuisine=c;return n;});}}>{c}</Chip>;})}</div>
-            </div>)}
-          </div>
-        )}
-
-        {/* Activity Type */}
-        {(filters.category==="Activities"||!filters.category||filters.category==="Surprise Me")&&(
-          <div style={{marginBottom:"22px"}}>
-            <button onClick={function(){setShowActivityTypes(!showActivityTypes);}} style={{background:"none",border:"none",padding:0,cursor:"pointer",display:"flex",alignItems:"center",gap:"6px",marginBottom:"8px",width:"100%"}}>
-              <span style={{fontSize:"12px",color:P.textDim,textTransform:"uppercase",letterSpacing:"0.15em",fontFamily:sans}}>🎯 Activity Type</span>
-              {filters.activityType&&<span style={{fontSize:"12px",color:P.gold,fontFamily:sans}}>· {filters.activityType}</span>}
-              <span style={{fontSize:"10px",color:P.textDim,marginLeft:"auto"}}>{showActivityTypes?"▴":"▾"}</span>
-            </button>
-            {showActivityTypes&&(<div>
-              {filters.activityType&&<div style={{marginBottom:"8px"}}><Chip small active onClick={function(){setFilters(function(f){const n=Object.assign({},f);delete n.activityType;return n;});}}>✕ Clear</Chip></div>}
-              <div style={{display:"flex",flexWrap:"wrap",gap:"6px"}}>{ACTIVITY_TYPES.map(function(a){return <Chip key={a} small active={filters.activityType===a} onClick={function(){setFilters(function(f){const n=Object.assign({},f);if(n.activityType===a)delete n.activityType;else n.activityType=a;return n;});}}>{a}</Chip>;})}</div>
-            </div>)}
-          </div>
-        )}
-
-        <Btn primary disabled={filtersSelected===0} onClick={function(){setSubScreen("rolling");doRoll();}} style={{width:"100%",padding:"16px",fontSize:"16px",boxShadow:filtersSelected>0?"0 4px 24px rgba(232,195,106,0.3)":"none",marginTop:"8px"}}>
-          🎲 Roll the Dice {filtersSelected>0?"("+filtersSelected+" set)":""}
-        </Btn>
-      </div>)}
-
-      {tab==="roll"&&subScreen==="rolling"&&(<div>
-        <button onClick={function(){setSubScreen("filters");setResult(null);setRolling(false);if(diceInterval.current)clearInterval(diceInterval.current);}} style={{background:"none",border:"none",color:P.textDim,fontSize:"14px",cursor:"pointer",padding:0,marginBottom:"28px",fontFamily:sans}}>← Change Filters</button>
-        <div style={{display:"flex",justifyContent:"center",gap:"20px",marginBottom:"36px",opacity:result?0.3:1,transition:"opacity 0.5s"}}>
-          <div style={{animation:rolling?"diceShake 0.1s infinite":"none"}}><DiceFace value={diceVals[0]} size={68}/></div>
-          <div style={{animation:rolling?"diceShake 0.1s infinite reverse":"none"}}><DiceFace value={diceVals[1]} size={68}/></div>
-        </div>
-        {rolling&&<div style={{textAlign:"center"}}>
-          <p style={{color:P.goldBright,fontSize:"15px",fontStyle:"italic",animation:"pulse 1s infinite"}}>Searching the city for you...</p>
-          <p style={{color:P.textDim,fontSize:"12px",fontFamily:sans,marginTop:"4px"}}>
-            {filters.neighborhood?"In "+filters.neighborhood:"All of NYC"}
-            {filters.cuisine?" · "+filters.cuisine:""}
-            {filters.activityType?" · "+filters.activityType:""}
-          </p>
-        </div>}
-        {result&&!rolling&&(<div>
-          <ResultCard result={result} locked={locked} rolling={rolling} onReroll={function(){setLocked(false);doRoll();}} onLockIn={function(){lockIn(result);}} onShare={function(){sharePlan(result);}}/>
-          {altResults.length>0&&(<div style={{marginTop:"16px"}}>
-            <button onClick={function(){setShowAlts(!showAlts);}} style={{background:"none",border:"none",color:P.textDim,fontSize:"12px",cursor:"pointer",fontFamily:sans,letterSpacing:"0.1em",textTransform:"uppercase",width:"100%",textAlign:"center",padding:"8px 0"}}>{showAlts?"Hide":"Show"} other picks ▾</button>
-            {showAlts&&altResults.map(function(alt,i){return(
-              <div key={i} onClick={function(){setResult(alt);setShowAlts(false);setLocked(false);}} style={{background:P.card,border:"1px solid "+P.border,borderRadius:"14px",padding:"14px 18px",cursor:"pointer",marginTop:"8px",display:"flex",alignItems:"center",gap:"12px"}}>
-                <span style={{fontSize:"26px"}}>{alt.emoji||"🎲"}</span>
-                <div><div style={{color:P.text,fontSize:"14px",fontWeight:"500",fontFamily:sans}}>{alt.name}</div><div style={{color:P.textDim,fontSize:"12px",fontFamily:sans}}>{alt.cuisine||alt.cat} · {alt.area}</div></div>
-              </div>);})}
-          </div>)}
-        </div>)}
-      </div>)}
-
-      {tab==="discover"&&<DiscoverScreen onPickEvent={function(ev){setResult({name:ev.name,desc:ev.desc,area:ev.area,cat:ev.cat||"Event",emoji:ev.emoji||"🎉"});setAltResults([]);setShowAlts(false);setLocked(false);setTab("roll");setSubScreen("rolling");setRolling(false);}}/>}
-
-      {tab==="calendar"&&(<div>
-        <h2 style={{fontSize:"24px",fontWeight:"400",margin:"0 0 4px",color:P.gold}}>My Dates</h2>
-        <p style={{fontSize:"13px",color:P.textDim,margin:"0 0 20px",fontFamily:sans}}>Your date history & upcoming plans</p>
-        <div style={{background:P.card,border:"1px solid "+P.border,borderRadius:"16px",padding:"20px",marginBottom:"24px"}}><MiniCalendar history={history}/></div>
-        {history.length>0&&(<div style={{display:"flex",gap:"8px",marginBottom:"24px"}}>
-          {[{n:history.filter(function(h){return h.status==="locked";}).length,l:"Upcoming",c:P.gold},{n:history.filter(function(h){return h.status==="completed";}).length,l:"Completed",c:P.green},{n:history.length,l:"Total",c:P.blue}].map(function(s,i){return(
-            <div key={i} style={{flex:1,background:P.card,border:"1px solid "+P.border,borderRadius:"14px",padding:"14px",textAlign:"center"}}><div style={{fontSize:"24px",fontWeight:"700",color:s.c,fontFamily:sans}}>{s.n}</div><div style={{fontSize:"11px",color:P.textDim,fontFamily:sans,textTransform:"uppercase",letterSpacing:"0.1em"}}>{s.l}</div></div>
-          );})}
-        </div>)}
-        {history.length===0&&<div style={{textAlign:"center",padding:"40px 20px",color:P.textDim,fontFamily:sans}}><div style={{fontSize:"32px",marginBottom:"12px"}}>🎲</div><p>No dates yet! Roll the dice to get started.</p></div>}
-        <div style={{display:"flex",flexDirection:"column",gap:"10px"}}>
-          {history.map(function(h){return(
-            <div key={h.id} style={{background:P.card,border:"1px solid "+P.border,borderRadius:"16px",padding:"16px 18px"}}>
-              <div style={{display:"flex",alignItems:"flex-start",gap:"12px"}}>
-                <span style={{fontSize:"28px"}}>{h.emoji||"🎉"}</span>
-                <div style={{flex:1}}>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:"8px"}}><div style={{fontFamily:sans,fontSize:"15px",color:P.text,fontWeight:"600"}}>{h.name}</div><span style={{fontSize:"10px",fontFamily:sans,fontWeight:"700",textTransform:"uppercase",letterSpacing:"0.1em",color:h.status==="completed"?P.green:P.gold,background:h.status==="completed"?"rgba(110,207,148,0.1)":P.goldDim,padding:"4px 10px",borderRadius:"20px",flexShrink:0}}>{h.status==="completed"?"Done":"Upcoming"}</span></div>
-                  <div style={{fontSize:"12px",color:P.textDim,fontFamily:sans,margin:"4px 0"}}>📍 {h.area}{h.address&&h.address!==h.area?" — "+h.address:""} · {new Date(h.lockedAt||h.completedAt).toLocaleDateString()}</div>
-                  {h.rating&&<div style={{fontSize:"13px",marginTop:"4px"}}>{"⭐".repeat(h.rating)}</div>}
-                  <div style={{display:"flex",gap:"6px",marginTop:"10px",flexWrap:"wrap",alignItems:"center"}}>
-                    {h.status==="locked"&&<div style={{display:"flex",gap:"4px",alignItems:"center"}}><span style={{fontSize:"11px",color:P.textDim,fontFamily:sans,marginRight:"2px"}}>Rate:</span>{[1,2,3,4,5].map(function(r){return(<button key={r} onClick={function(){markComplete(h.id,r);}} style={{background:"none",border:"1px solid "+P.border,borderRadius:"6px",padding:"3px 6px",cursor:"pointer",fontSize:"11px",lineHeight:1}}>{"★".repeat(r)}</button>);})}</div>}
-                    <button onClick={function(){removeEntry(h.id);}} style={{background:"none",border:"none",color:P.textDim,fontSize:"12px",cursor:"pointer",fontFamily:sans,marginLeft:"auto"}}>Remove</button>
-                  </div>
-                </div>
+        {tab==="roll"&&subScreen==="filters"&&(<div>
+          <h2 style={{fontSize:"26px",fontWeight:"400",margin:"0 0 4px",color:P.gold}}>Set the Scene</h2>
+          <p style={{fontSize:"13px",color:P.textDim,margin:"0 0 20px",fontFamily:sans}}>Pick what matters — skip what doesn't</p>
+          <WeatherBadge weather={weather} loading={weatherLoading}/>
+          {Object.entries(FILTERS_MAIN).map(function([key,cfg]){return(
+            <div key={key} style={{marginBottom:"22px"}}>
+              <div style={{fontSize:"12px",color:P.textDim,textTransform:"uppercase",letterSpacing:"0.15em",marginBottom:"8px",fontFamily:sans}}>
+                {cfg.icon} {cfg.label}
+                {key==="budget"&&<span style={{color:P.accent,marginLeft:"6px",textTransform:"none",letterSpacing:"0",fontSize:"11px"}}>($150–300 = upscale · Splurge = $300+)</span>}
+              </div>
+              <div style={{display:"flex",flexWrap:"wrap",gap:"8px"}}>
+                {cfg.options.map(function(opt){return <Chip key={opt} active={filters[key]===opt} onClick={function(){setFilters(function(f){const n=Object.assign({},f);if(n[key]===opt)delete n[key];else n[key]=opt;return n;});}}>{opt}</Chip>;})}
               </div>
             </div>
           );})}
-        </div>
-      </div>)}
-    </div>
-    <NavBar tab={tab} setTab={function(t){setTab(t);if(t==="roll")setSubScreen("filters");}} historyCount={history.filter(function(h){return h.status==="locked";}).length}/>
+
+          {/* Neighborhood */}
+          <div style={{marginBottom:"22px"}}>
+            <button onClick={function(){setShowNeighborhoods(!showNeighborhoods);}} style={{background:"none",border:"none",padding:0,cursor:"pointer",display:"flex",alignItems:"center",gap:"6px",marginBottom:"8px",width:"100%"}}>
+              <span style={{fontSize:"12px",color:P.textDim,textTransform:"uppercase",letterSpacing:"0.15em",fontFamily:sans}}>📍 Neighborhood</span>
+              {filters.neighborhood&&<span style={{fontSize:"12px",color:P.gold,fontFamily:sans}}>· {filters.neighborhood}</span>}
+              <span style={{fontSize:"10px",color:P.textDim,marginLeft:"auto"}}>{showNeighborhoods?"▴":"▾"}</span>
+            </button>
+            {showNeighborhoods&&(<div>
+              {filters.neighborhood&&<div style={{marginBottom:"8px"}}><Chip small active onClick={function(){setFilters(function(f){const n=Object.assign({},f);delete n.neighborhood;return n;});;}}>✕ Clear</Chip></div>}
+              {Object.entries(NEIGHBORHOODS).map(function([borough,hoods]){return(
+                <div key={borough} style={{marginTop:"10px"}}>
+                  <div style={{fontSize:"11px",color:P.accent,fontFamily:sans,fontWeight:"700",marginBottom:"6px"}}>{borough}</div>
+                  <div style={{display:"flex",flexWrap:"wrap",gap:"6px"}}>
+                    {hoods.map(function(h){return <Chip key={h} small active={filters.neighborhood===h} onClick={function(){setFilters(function(f){const n=Object.assign({},f);if(n.neighborhood===h)delete n.neighborhood;else n.neighborhood=h;return n;});}}>{h}</Chip>;})}
+                  </div>
+                </div>);})}
+            </div>)}
+          </div>
+
+          {/* Cuisine */}
+          {(filters.category==="Food & Drink"||!filters.category||filters.category==="Surprise Me")&&(
+            <div style={{marginBottom:"22px"}}>
+              <button onClick={function(){setShowCuisines(!showCuisines);}} style={{background:"none",border:"none",padding:0,cursor:"pointer",display:"flex",alignItems:"center",gap:"6px",marginBottom:"8px",width:"100%"}}>
+                <span style={{fontSize:"12px",color:P.textDim,textTransform:"uppercase",letterSpacing:"0.15em",fontFamily:sans}}>🍽 Cuisine</span>
+                {filters.cuisine&&<span style={{fontSize:"12px",color:P.gold,fontFamily:sans}}>· {filters.cuisine}</span>}
+                <span style={{fontSize:"10px",color:P.textDim,marginLeft:"auto"}}>{showCuisines?"▴":"▾"}</span>
+              </button>
+              {showCuisines&&(<div>
+                {filters.cuisine&&<div style={{marginBottom:"8px"}}><Chip small active onClick={function(){setFilters(function(f){const n=Object.assign({},f);delete n.cuisine;return n;});}}>✕ Clear</Chip></div>}
+                <div style={{display:"flex",flexWrap:"wrap",gap:"6px"}}>{CUISINES.map(function(c){return <Chip key={c} small active={filters.cuisine===c} onClick={function(){setFilters(function(f){const n=Object.assign({},f);if(n.cuisine===c)delete n.cuisine;else n.cuisine=c;return n;});}}>{c}</Chip>;})}</div>
+              </div>)}
+            </div>
+          )}
+
+          {/* Activity Type */}
+          {(filters.category==="Activities"||!filters.category||filters.category==="Surprise Me")&&(
+            <div style={{marginBottom:"22px"}}>
+              <button onClick={function(){setShowActivityTypes(!showActivityTypes);}} style={{background:"none",border:"none",padding:0,cursor:"pointer",display:"flex",alignItems:"center",gap:"6px",marginBottom:"8px",width:"100%"}}>
+                <span style={{fontSize:"12px",color:P.textDim,textTransform:"uppercase",letterSpacing:"0.15em",fontFamily:sans}}>🎯 Activity Type</span>
+                {filters.activityType&&<span style={{fontSize:"12px",color:P.gold,fontFamily:sans}}>· {filters.activityType}</span>}
+                <span style={{fontSize:"10px",color:P.textDim,marginLeft:"auto"}}>{showActivityTypes?"▴":"▾"}</span>
+              </button>
+              {showActivityTypes&&(<div>
+                {filters.activityType&&<div style={{marginBottom:"8px"}}><Chip small active onClick={function(){setFilters(function(f){const n=Object.assign({},f);delete n.activityType;return n;});}}>✕ Clear</Chip></div>}
+                <div style={{display:"flex",flexWrap:"wrap",gap:"6px"}}>{ACTIVITY_TYPES.map(function(a){return <Chip key={a} small active={filters.activityType===a} onClick={function(){setFilters(function(f){const n=Object.assign({},f);if(n.activityType===a)delete n.activityType;else n.activityType=a;return n;});}}>{a}</Chip>;})}</div>
+              </div>)}
+            </div>
+          )}
+
+          <Btn primary onClick={function(){setSubScreen("rolling");doRoll();}} style={{width:"100%",padding:"16px",fontSize:"16px",boxShadow:"0 4px 24px rgba(232,195,106,0.3)",marginTop:"8px"}}>
+            🎲 Roll the Dice {activeFilterCount>0?"("+activeFilterCount+" set)":""}
+          </Btn>
+        </div>)}
+
+        {tab==="roll"&&subScreen==="rolling"&&(<div>
+          <button onClick={function(){setSubScreen("filters");setResult(null);setRolling(false);setAltsLoading(false);if(diceInterval.current){clearInterval(diceInterval.current);diceInterval.current=null;}}} style={{background:"none",border:"none",color:P.textDim,fontSize:"14px",cursor:"pointer",padding:0,marginBottom:"28px",fontFamily:sans}}>← Change Filters</button>
+          <div style={{display:"flex",justifyContent:"center",gap:"32px",marginBottom:"40px",opacity:result?0.2:1,transition:"opacity 0.7s"}}>
+            <Dice3D value={diceVals[0]} rolling={rolling} size={82}/>
+            <Dice3D value={diceVals[1]} rolling={rolling} size={82}/>
+          </div>
+          {rolling&&<div style={{textAlign:"center"}}>
+            <p style={{color:P.goldBright,fontSize:"15px",fontStyle:"italic",animation:"pulse 1s infinite"}}>Searching the city for you...</p>
+            <p style={{color:P.textDim,fontSize:"12px",fontFamily:sans,marginTop:"4px"}}>
+              {filters.neighborhood?"In "+filters.neighborhood:"All of NYC"}
+              {filters.cuisine?" · "+filters.cuisine:""}
+              {filters.activityType?" · "+filters.activityType:""}
+            </p>
+          </div>}
+          {result&&!rolling&&(<div>
+            <ResultCard result={result} locked={locked} rolling={rolling} altsLoading={altsLoading} onReroll={function(){setLocked(false);setAltResults([]);setShowAlts(false);doRoll();}} onLockIn={function(){lockIn(result);}} onShare={function(){sharePlan(result);}}/>
+            {altResults.length>0&&(<div style={{marginTop:"16px"}}>
+              <button onClick={function(){setShowAlts(!showAlts);}} style={{background:"none",border:"none",color:P.textDim,fontSize:"12px",cursor:"pointer",fontFamily:sans,letterSpacing:"0.1em",textTransform:"uppercase",width:"100%",textAlign:"center",padding:"8px 0"}}>{showAlts?"Hide":"Show"} other picks ▾</button>
+              {showAlts&&altResults.map(function(alt,i){return(
+                <div key={i} onClick={function(){setResult(alt);setShowAlts(false);setLocked(false);}} style={{background:P.card,border:"1px solid "+P.border,borderRadius:"14px",padding:"14px 18px",cursor:"pointer",marginTop:"8px",display:"flex",alignItems:"center",gap:"12px"}}>
+                  <span style={{fontSize:"26px"}}>{alt.emoji||"🎲"}</span>
+                  <div><div style={{color:P.text,fontSize:"14px",fontWeight:"500",fontFamily:sans}}>{alt.name}</div><div style={{color:P.textDim,fontSize:"12px",fontFamily:sans}}>{alt.cuisine||alt.cat} · {alt.area}</div></div>
+                </div>);})}
+            </div>)}
+          </div>)}
+        </div>)}
+
+        {tab==="discover"&&<DiscoverScreen onPickEvent={function(ev){setResult({name:ev.name,desc:ev.desc,area:ev.area,cat:ev.cat||"Event",emoji:ev.emoji||"🎉"});setAltResults([]);setShowAlts(false);setLocked(false);setTab("roll");setSubScreen("rolling");setRolling(false);}}/>}
+
+        {tab==="calendar"&&(<div>
+          <h2 style={{fontSize:"24px",fontWeight:"400",margin:"0 0 4px",color:P.gold}}>My Dates</h2>
+          <p style={{fontSize:"13px",color:P.textDim,margin:"0 0 20px",fontFamily:sans}}>Your date history & upcoming plans</p>
+          <div style={{background:P.card,border:"1px solid "+P.border,borderRadius:"16px",padding:"20px",marginBottom:"24px"}}><MiniCalendar history={history}/></div>
+          {history.length>0&&(<div style={{display:"flex",gap:"8px",marginBottom:"24px"}}>
+            {[{n:history.filter(function(h){return h.status==="locked";}).length,l:"Upcoming",c:P.gold},{n:history.filter(function(h){return h.status==="completed";}).length,l:"Completed",c:P.green},{n:history.length,l:"Total",c:P.blue}].map(function(s,i){return(
+              <div key={i} style={{flex:1,background:P.card,border:"1px solid "+P.border,borderRadius:"14px",padding:"14px",textAlign:"center"}}><div style={{fontSize:"24px",fontWeight:"700",color:s.c,fontFamily:sans}}>{s.n}</div><div style={{fontSize:"11px",color:P.textDim,fontFamily:sans,textTransform:"uppercase",letterSpacing:"0.1em"}}>{s.l}</div></div>
+            );})}
+          </div>)}
+          {history.length===0&&<div style={{textAlign:"center",padding:"40px 20px",color:P.textDim,fontFamily:sans}}><div style={{fontSize:"32px",marginBottom:"12px"}}>🎲</div><p>No dates yet! Roll the dice to get started.</p></div>}
+          <div style={{display:"flex",flexDirection:"column",gap:"10px"}}>
+            {history.map(function(h){return(
+              <div key={h.id} style={{background:P.card,border:"1px solid "+P.border,borderRadius:"16px",padding:"16px 18px"}}>
+                <div style={{display:"flex",alignItems:"flex-start",gap:"12px"}}>
+                  <span style={{fontSize:"28px"}}>{h.emoji||"🎉"}</span>
+                  <div style={{flex:1}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:"8px"}}><div style={{fontFamily:sans,fontSize:"15px",color:P.text,fontWeight:"600"}}>{h.name}</div><span style={{fontSize:"10px",fontFamily:sans,fontWeight:"700",textTransform:"uppercase",letterSpacing:"0.1em",color:h.status==="completed"?P.green:P.gold,background:h.status==="completed"?"rgba(110,207,148,0.1)":P.goldDim,padding:"4px 10px",borderRadius:"20px",flexShrink:0}}>{h.status==="completed"?"Done":"Upcoming"}</span></div>
+                    <div style={{fontSize:"12px",color:P.textDim,fontFamily:sans,margin:"4px 0"}}>📍 {h.area}{h.address&&h.address!==h.area?" — "+h.address:""} · {new Date(h.lockedAt||h.completedAt).toLocaleDateString()}</div>
+                    {h.rating&&<div style={{fontSize:"13px",marginTop:"4px"}}>{"⭐".repeat(h.rating)}</div>}
+                    <div style={{display:"flex",gap:"6px",marginTop:"10px",flexWrap:"wrap",alignItems:"center"}}>
+                      {h.status==="locked"&&<div style={{display:"flex",gap:"4px",alignItems:"center"}}><span style={{fontSize:"11px",color:P.textDim,fontFamily:sans,marginRight:"2px"}}>Rate:</span>{[1,2,3,4,5].map(function(r){return(<button key={r} onClick={function(){markComplete(h.id,r);}} style={{background:"none",border:"1px solid "+P.border,borderRadius:"6px",padding:"3px 6px",cursor:"pointer",fontSize:"11px",lineHeight:1}}>{"★".repeat(r)}</button>);})}</div>}
+                      <button onClick={function(){removeEntry(h.id);}} style={{background:"none",border:"none",color:P.textDim,fontSize:"12px",cursor:"pointer",fontFamily:sans,marginLeft:"auto"}}>Remove</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );})}
+          </div>
+        </div>)}
+      </div>{/* end .main-content */}
+    </div>{/* end .app-shell */}
+
+    {/* Mobile bottom nav */}
+    <NavBar tab={tab} setTab={handleTabChange} historyCount={history.filter(function(h){return h.status==="locked";}).length}/>
   </div>);
 }
 
