@@ -108,18 +108,32 @@ const ACTIVITY_TYPES=["Outdoors & Nature","Museum & Art","Live Music & Concerts"
 // ── API PROXY ──
 const API_URL="/api/search";
 
+// Strip any <cite ...>...</cite> tags the model may inject when using web_search
+function stripCites(str){
+  if(typeof str!=="string")return str;
+  return str.replace(/<cite[^>]*>([\s\S]*?)<\/cite>/gi,"$1").replace(/<\/?cite[^>]*>/gi,"").trim();
+}
+function cleanResult(obj){
+  if(!obj||typeof obj!=="object")return obj;
+  const out={};
+  Object.keys(obj).forEach(function(k){out[k]=typeof obj[k]==="string"?stripCites(obj[k]):obj[k];});
+  return out;
+}
+
 async function fetchSuggestion(type,filters,usedNames){
   const{timeOfDay,weather,vibe,budget,duration,neighborhood,cuisine,activityType}=filters;
   const season=getSeason(),today=formatDate(new Date());
   const avoidList=(usedNames||[]).slice(-40).join(", ");
   const neighborhoodStr=neighborhood||"anywhere in NYC or nearby";
+  // IMPORTANT note added to both prompts: no citation markup, plain text values only
+  const jsonWarning="\n\nCRITICAL: Respond with ONLY a raw JSON object. No markdown, no backticks, no <cite> tags, no citation markup of any kind. All field values must be plain text strings only.";
   let prompt;
   if(type==="food"){
     const cuisineStr=cuisine||"any cuisine — surprise us";
-    prompt="You are a NYC restaurant and bar expert with deep knowledge of every neighborhood. Suggest ONE specific real restaurant, bar, café, bakery, or food experience matching these criteria:\n- Neighborhood: "+neighborhoodStr+"\n- Cuisine preference: "+cuisineStr+"\n- Time of day: "+(timeOfDay||"any")+"\n- Current weather: "+(weather||"any")+" (suggest cozy/indoor spots for rainy/cold, outdoor/rooftop for sunny/warm)\n- Vibe: "+(vibe||"any")+"\n- Budget: "+(budget||"any")+" (Free=free tastings/events, Under $50=casual, $50-150=mid-range, $150-300=upscale, Splurge=$300+ per person)\n- Duration: "+(duration||"any")+"\n- Season: "+season+"\n- Today: "+today+"\n"+(avoidList?"- AVOID these (already suggested): "+avoidList:"")+"\n\nPick a REAL, currently-operating place. Favor hidden gems, neighborhood favorites, new openings, and spots with character over obvious tourist places. Include specific dishes to order.\n\nRespond with ONLY a JSON object, no markdown, no backticks:\n{\"name\":\"...\",\"desc\":\"One vivid sentence about what makes this place special and what to order\",\"area\":\"Neighborhood\",\"address\":\"Full street address\",\"cat\":\"Food & Drink\",\"priceRange\":\"$/$$/$$$/$$$$\",\"cuisine\":\"Cuisine type\",\"emoji\":\"fitting food/drink emoji\",\"tip\":\"One insider tip for this specific place\"}";
+    prompt="You are a NYC restaurant and bar expert with deep knowledge of every neighborhood. Suggest ONE specific real restaurant, bar, café, bakery, or food experience matching these criteria:\n- Neighborhood: "+neighborhoodStr+"\n- Cuisine preference: "+cuisineStr+"\n- Time of day: "+(timeOfDay||"any")+"\n- Current weather: "+(weather||"any")+" (suggest cozy/indoor spots for rainy/cold, outdoor/rooftop for sunny/warm)\n- Vibe: "+(vibe||"any")+"\n- Budget: "+(budget||"any")+" (Free=free tastings/events, Under $50=casual, $50-150=mid-range, $150-300=upscale, Splurge=$300+ per person)\n- Duration: "+(duration||"any")+"\n- Season: "+season+"\n- Today: "+today+"\n"+(avoidList?"- AVOID these (already suggested): "+avoidList:"")+"\n\nPick a REAL, currently-operating place. Favor hidden gems, neighborhood favorites, new openings, and spots with character over obvious tourist places. Include specific dishes to order."+jsonWarning+"\n{\"name\":\"...\",\"desc\":\"One vivid sentence about what makes this place special and what to order\",\"area\":\"Neighborhood\",\"address\":\"Full street address\",\"cat\":\"Food & Drink\",\"priceRange\":\"$/$$/$$$/$$$$\",\"cuisine\":\"Cuisine type\",\"emoji\":\"fitting food/drink emoji\",\"tip\":\"One insider tip for this specific place\"}";
   } else {
     const actTypeStr=activityType||"any type of activity or experience";
-    prompt="You are a NYC experiences expert who knows every hidden gem, seasonal event, and unique activity. Suggest ONE specific real activity, experience, or place to visit matching these criteria:\n- Type: "+actTypeStr+"\n- Neighborhood: "+neighborhoodStr+"\n- Time of day: "+(timeOfDay||"any")+"\n- Current weather: "+(weather||"any")+" (suggest indoor activities for rainy/cold, outdoor for sunny)\n- Vibe: "+(vibe||"any")+"\n- Budget: "+(budget||"any")+" (Free, Under $50, $50-150, $150-300, Splurge=$300+)\n- Duration: "+(duration||"any")+"\n- Season: "+season+" (consider seasonal events, holiday activities, weather-appropriate picks)\n- Today: "+today+"\n"+(avoidList?"- AVOID these (already suggested): "+avoidList:"")+"\n\nSuggest a REAL, specific, currently-available experience. This could be a specific museum exhibit, a park activity, a class, a show, an immersive experience, a walking route, a seasonal event, a sporting event, a spa, a day trip — anything that makes for a great date. Be creative and specific. Search for what's currently available.\n\nRespond with ONLY a JSON object, no markdown, no backticks:\n{\"name\":\"...\",\"desc\":\"One vivid sentence about what makes this experience special and why it's great for a date\",\"area\":\"Neighborhood or location\",\"address\":\"Address if applicable, or general area\",\"cat\":\"Activity\",\"emoji\":\"fitting emoji\",\"tip\":\"One insider tip\"}";
+    prompt="You are a NYC experiences expert who knows every hidden gem, seasonal event, and unique activity. Suggest ONE specific real activity, experience, or place to visit matching these criteria:\n- Type: "+actTypeStr+"\n- Neighborhood: "+neighborhoodStr+"\n- Time of day: "+(timeOfDay||"any")+"\n- Current weather: "+(weather||"any")+" (suggest indoor activities for rainy/cold, outdoor for sunny)\n- Vibe: "+(vibe||"any")+"\n- Budget: "+(budget||"any")+" (Free, Under $50, $50-150, $150-300, Splurge=$300+)\n- Duration: "+(duration||"any")+"\n- Season: "+season+" (consider seasonal events, holiday activities, weather-appropriate picks)\n- Today: "+today+"\n"+(avoidList?"- AVOID these (already suggested): "+avoidList:"")+"\n\nSuggest a REAL, specific, currently-available experience. This could be a specific museum exhibit, a park activity, a class, a show, an immersive experience, a walking route, a seasonal event, a sporting event, a spa, a day trip — anything that makes for a great date. Be creative and specific. Search for what's currently available."+jsonWarning+"\n{\"name\":\"...\",\"desc\":\"One vivid sentence about what makes this experience special and why it's great for a date\",\"area\":\"Neighborhood or location\",\"address\":\"Address if applicable, or general area\",\"cat\":\"Activity\",\"emoji\":\"fitting emoji\",\"tip\":\"One insider tip\"}";
   }
   try{
     const resp=await fetch(API_URL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-6",max_tokens:1000,tools:[{type:"web_search_20250305",name:"web_search"}],messages:[{role:"user",content:prompt}]})});
@@ -130,13 +144,21 @@ async function fetchSuggestion(type,filters,usedNames){
     }
     const data=await resp.json();
     if(data.error){console.error("API returned error:",data.error);return null;}
-    const text=(data.content||[]).map(function(b){return b.type==="text"?b.text:"";}).join("");
-    const clean=text.replace(/```json|```/g,"").trim();
-    const match=clean.match(/\{[\s\S]*\}/);
+    // Gather all text blocks and strip any cite tags before attempting JSON parse
+    const rawText=(data.content||[]).map(function(b){return b.type==="text"?b.text:"";}).join("");
+    const text=stripCites(rawText).replace(/```json|```/g,"").trim();
+    const match=text.match(/\{[\s\S]*\}/);
     if(match){
-      try{return JSON.parse(match[0]);}catch(e){console.error("JSON parse failed:",match[0]);return null;}
+      try{return cleanResult(JSON.parse(match[0]));}
+      catch(e){
+        // Last resort: try extracting JSON after stripping any remaining angle-bracket tags
+        try{
+          const stripped=match[0].replace(/<[^>]+>/g,"");
+          return cleanResult(JSON.parse(stripped));
+        }catch(e2){console.error("JSON parse failed:",match[0].slice(0,200));return null;}
+      }
     }
-    console.warn("No JSON object found in response:",text.slice(0,300));
+    console.warn("No JSON found in response. Raw text:",rawText.slice(0,300));
   }catch(err){console.error("Engine error:",err);}
   return null;
 }
