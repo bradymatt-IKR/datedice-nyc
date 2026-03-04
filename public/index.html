@@ -122,13 +122,21 @@ async function fetchSuggestion(type,filters,usedNames){
     prompt="You are a NYC experiences expert who knows every hidden gem, seasonal event, and unique activity. Suggest ONE specific real activity, experience, or place to visit matching these criteria:\n- Type: "+actTypeStr+"\n- Neighborhood: "+neighborhoodStr+"\n- Time of day: "+(timeOfDay||"any")+"\n- Current weather: "+(weather||"any")+" (suggest indoor activities for rainy/cold, outdoor for sunny)\n- Vibe: "+(vibe||"any")+"\n- Budget: "+(budget||"any")+" (Free, Under $50, $50-150, $150-300, Splurge=$300+)\n- Duration: "+(duration||"any")+"\n- Season: "+season+" (consider seasonal events, holiday activities, weather-appropriate picks)\n- Today: "+today+"\n"+(avoidList?"- AVOID these (already suggested): "+avoidList:"")+"\n\nSuggest a REAL, specific, currently-available experience. This could be a specific museum exhibit, a park activity, a class, a show, an immersive experience, a walking route, a seasonal event, a sporting event, a spa, a day trip — anything that makes for a great date. Be creative and specific. Search for what's currently available.\n\nRespond with ONLY a JSON object, no markdown, no backticks:\n{\"name\":\"...\",\"desc\":\"One vivid sentence about what makes this experience special and why it's great for a date\",\"area\":\"Neighborhood or location\",\"address\":\"Address if applicable, or general area\",\"cat\":\"Activity\",\"emoji\":\"fitting emoji\",\"tip\":\"One insider tip\"}";
   }
   try{
-    const resp=await fetch(API_URL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,tools:[{type:"web_search_20250305",name:"web_search"}],messages:[{role:"user",content:prompt}]})});
-    if(!resp.ok)return null;
+    const resp=await fetch(API_URL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-6",max_tokens:1000,tools:[{type:"web_search_20250305",name:"web_search"}],messages:[{role:"user",content:prompt}]})});
+    if(!resp.ok){
+      const errBody=await resp.text().catch(function(){return"(unreadable)";});
+      console.error("API error "+resp.status+":",errBody);
+      return null;
+    }
     const data=await resp.json();
-    const text=(data.content||[]).map(function(b){return b.text||"";}).join("");
+    if(data.error){console.error("API returned error:",data.error);return null;}
+    const text=(data.content||[]).map(function(b){return b.type==="text"?b.text:"";}).join("");
     const clean=text.replace(/```json|```/g,"").trim();
     const match=clean.match(/\{[\s\S]*\}/);
-    if(match)return JSON.parse(match[0]);
+    if(match){
+      try{return JSON.parse(match[0]);}catch(e){console.error("JSON parse failed:",match[0]);return null;}
+    }
+    console.warn("No JSON object found in response:",text.slice(0,300));
   }catch(err){console.error("Engine error:",err);}
   return null;
 }
@@ -336,7 +344,7 @@ const ResultCard=({result,onReroll,onLockIn,onShare,locked,rolling:isRolling,alt
 const DiscoverScreen=({onPickEvent})=>{
   const[events,setEvents]=useState([]);const[loading,setLoading]=useState(false);const[searched,setSearched]=useState(false);const[query,setQuery]=useState("tonight");
   const searchEvents=async function(){setLoading(true);setSearched(true);
-    try{const resp=await fetch(API_URL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,tools:[{type:"web_search_20250305",name:"web_search"}],messages:[{role:"user",content:"Today is "+formatDate(new Date())+". Find 6-8 specific events, shows, exhibitions, pop-ups, concerts happening in New York City "+query+" ("+getDateRangeLabel(query)+"). Search for current real events. For each give name, 1-sentence description, location/neighborhood, category, approximate cost, fitting emoji. Respond ONLY with a JSON array: [{\"name\":\"...\",\"desc\":\"...\",\"area\":\"...\",\"cat\":\"...\",\"cost\":\"...\",\"emoji\":\"...\"}]"}]})});
+    try{const resp=await fetch(API_URL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-6",max_tokens:1000,tools:[{type:"web_search_20250305",name:"web_search"}],messages:[{role:"user",content:"Today is "+formatDate(new Date())+". Find 6-8 specific events, shows, exhibitions, pop-ups, concerts happening in New York City "+query+" ("+getDateRangeLabel(query)+"). Search for current real events. For each give name, 1-sentence description, location/neighborhood, category, approximate cost, fitting emoji. Respond ONLY with a JSON array: [{\"name\":\"...\",\"desc\":\"...\",\"area\":\"...\",\"cat\":\"...\",\"cost\":\"...\",\"emoji\":\"...\"}]"}]})});
       const data=await resp.json();const text=(data.content||[]).map(function(b){return b.text||"";}).join("");const clean=text.replace(/```json|```/g,"").trim();const match=clean.match(/\[[\s\S]*\]/);
       if(match)setEvents(JSON.parse(match[0]).slice(0,8));else setEvents([]);
     }catch(err){console.error(err);setEvents([]);}setLoading(false);};
