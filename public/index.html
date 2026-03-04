@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Date Dice NYC</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎲</text></svg>">
+  <meta name="theme-color" content="#0c0c18">
+  <meta name="description" content="Roll the dice. Let NYC surprise you. A couples' date night generator powered by live search.">
+  <meta property="og:title" content="Date Dice NYC">
+  <meta property="og:description" content="Roll the dice. Let NYC surprise you.">
+  <style>
+    *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;margin:0;padding:0}
+    body{background:#0c0c18;color:#f0ece2;font-family:'Georgia','Palatino Linotype',serif;overflow-x:hidden}
+    ::-webkit-scrollbar{width:4px}::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.1);border-radius:4px}
+    @keyframes diceShake{0%{transform:translate(0,0) rotate(0deg)}25%{transform:translate(-3px,2px) rotate(-5deg)}50%{transform:translate(3px,-2px) rotate(5deg)}75%{transform:translate(-2px,-3px) rotate(-3deg)}100%{transform:translate(2px,3px) rotate(3deg)}}
+    @keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+    @keyframes pulse{0%,100%{opacity:0.5}50%{opacity:1}}
+    #root{min-height:100vh}
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+  <script type="text/babel">
+const {useState,useEffect,useRef,useCallback}=React;
+
+const P={bg:"#0c0c18",card:"rgba(255,255,255,0.04)",border:"rgba(255,255,255,0.08)",gold:"#e8c36a",goldDim:"rgba(232,195,106,0.15)",goldBright:"#f5d98a",text:"#f0ece2",textDim:"rgba(240,236,226,0.45)",accent:"#c97d4a",rose:"#d4727e",green:"#6ecf94",blue:"#6aafe8",grad:"linear-gradient(135deg, #e8c36a, #c97d4a)"};
+const sans="'Helvetica Neue','Segoe UI',sans-serif";
+const serif="'Georgia','Palatino Linotype',serif";
+
+// ── DATE/TIME/SEASON ──
+function formatDate(d){return d.toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric",year:"numeric"});}
+function getTimeOfDay(){const h=new Date().getHours();if(h<6)return"Late Night";if(h<12)return"Morning";if(h<17)return"Afternoon";if(h<21)return"Evening";return"Late Night";}
+function getSeason(){const m=new Date().getMonth();if(m>=2&&m<=4)return"Spring";if(m>=5&&m<=7)return"Summer";if(m>=8&&m<=10)return"Fall";return"Winter";}
+function getDateRangeLabel(q){
+  const now=new Date(),day=now.getDay();
+  const fmt=d=>d.toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"});
+  if(q==="tonight")return"Tonight, "+fmt(now);
+  if(q==="this week"){const e=new Date(now);e.setDate(e.getDate()+(7-day));return fmt(now)+" – "+fmt(e);}
+  if(q==="this weekend"){const s=new Date(now);s.setDate(s.getDate()+(6-day));const su=new Date(s);su.setDate(su.getDate()+1);return fmt(s)+" – "+fmt(su);}
+  if(q==="next week"){const m2=new Date(now);m2.setDate(m2.getDate()+(8-day));const su=new Date(m2);su.setDate(su.getDate()+6);return fmt(m2)+" – "+fmt(su);}
+  return"";
+}
+
+// ── WEATHER ──
+const WMO={0:{l:"Clear Sky",i:"☀️"},1:{l:"Mainly Clear",i:"🌤"},2:{l:"Partly Cloudy",i:"⛅"},3:{l:"Overcast",i:"☁️"},45:{l:"Fog",i:"🌫"},48:{l:"Freezing Fog",i:"🌫"},51:{l:"Light Drizzle",i:"🌦"},53:{l:"Drizzle",i:"🌧"},55:{l:"Heavy Drizzle",i:"🌧"},56:{l:"Freezing Drizzle",i:"🌧"},57:{l:"Heavy Freezing Drizzle",i:"🌧"},61:{l:"Light Rain",i:"🌧"},63:{l:"Moderate Rain",i:"🌧"},65:{l:"Heavy Rain",i:"🌧️"},66:{l:"Freezing Rain",i:"🌧"},67:{l:"Heavy Freezing Rain",i:"🌧"},71:{l:"Light Snow",i:"🌨"},73:{l:"Moderate Snow",i:"❄️"},75:{l:"Heavy Snow",i:"❄️"},77:{l:"Snow Grains",i:"❄️"},80:{l:"Light Showers",i:"🌦"},81:{l:"Moderate Showers",i:"🌧"},82:{l:"Violent Showers",i:"⛈"},85:{l:"Light Snow Showers",i:"🌨"},86:{l:"Heavy Snow Showers",i:"❄️"},95:{l:"Thunderstorm",i:"⛈"},96:{l:"Thunderstorm w/ Hail",i:"⛈"},99:{l:"Severe Thunderstorm",i:"⛈"}};
+function classifyWeather(tempF,code,humidity,wind){
+  if([95,96,99].includes(code))return"Stormy";if([71,73,75,77,85,86].includes(code))return"Snowy";
+  if([51,53,55,56,57,61,63,65,66,67,80,81,82].includes(code))return"Rainy";if([45,48].includes(code))return"Foggy";
+  if(tempF<=25)return"Frigid";if(tempF<=40)return"Cold";if(tempF>=90)return"Hot";if(wind>=25)return"Windy";
+  if(code<=1&&tempF>=65)return"Sunny";if(code<=1)return"Mild";if(code===2)return"Partly Cloudy";if(code===3)return"Cloudy";
+  return tempF>=65?"Sunny":"Mild";
+}
+function weatherToFilter(c){return{Sunny:"Sunny",Hot:"Hot",Mild:"Sunny","Partly Cloudy":"Cloudy",Cloudy:"Cloudy",Windy:"Windy",Foggy:"Cloudy",Rainy:"Rainy",Stormy:"Rainy",Snowy:"Snowy",Cold:"Cold",Frigid:"Cold"}[c]||"Any Weather";}
+
+// ── STORAGE (localStorage for standalone) ──
+function loadData(key,fallback){try{const v=localStorage.getItem(key);return v?JSON.parse(v):fallback||[];}catch{return fallback||[];}}
+function saveData(key,val){try{localStorage.setItem(key,JSON.stringify(val));}catch(e){console.error(e);}}
+
+// ── DATA ──
+const NEIGHBORHOODS={"Brooklyn":["Carroll Gardens","Cobble Hill","Brooklyn Heights","DUMBO","Park Slope","Prospect Heights","Williamsburg","Greenpoint","Bushwick","Fort Greene","Clinton Hill","Gowanus","Red Hook","Bay Ridge","Bed-Stuy","Boerum Hill","Crown Heights","Sunset Park","Flatbush"],"Manhattan":["West Village","East Village","Lower East Side","SoHo","NoHo","Nolita","Chinatown","Little Italy","Tribeca","Chelsea","Hell's Kitchen","Midtown","Flatiron","NoMad","Gramercy","Murray Hill","Upper East Side","Upper West Side","Harlem","Washington Heights","Financial District","East Harlem"],"Queens":["Astoria","Long Island City","Flushing","Jackson Heights","Woodside","Sunnyside"],"Bronx":["Arthur Avenue","Mott Haven","City Island"],"Across the River":["Hoboken","Jersey City"]};
+const CUISINES=["Italian","Japanese","Mexican","Chinese","Thai","Korean","Indian","French","Vietnamese","Mediterranean","Middle Eastern","Ethiopian","Peruvian","Colombian","Greek","Spanish","American","Southern","BBQ","Seafood","Pizza","Sushi","Ramen","Tacos","Dim Sum","Steakhouse","Farm-to-Table","Vegan","Brunch","Bakery & Pastry","Cocktail Bar","Wine Bar","Beer Garden","Coffee","Dessert","Food Hall","Deli & Sandwich"];
+const ACTIVITY_TYPES=["Outdoors & Nature","Museum & Art","Live Music & Concerts","Comedy","Theater & Performance","Immersive Experience","Sports & Games","Wellness & Spa","Shopping & Markets","Classes & Workshops","Tours & Walks","Day Trip","Nightlife & Dancing","Arcade & Gaming","Film & Cinema","Photography Walk","Boat & Water","Seasonal & Holiday"];
+
+// ── API PROXY ──
+const API_URL="/api/search";
+
+async function fetchSuggestion(type,filters,usedNames){
+  const{timeOfDay,weather,vibe,budget,duration,neighborhood,cuisine,activityType}=filters;
+  const season=getSeason(),today=formatDate(new Date());
+  const avoidList=(usedNames||[]).slice(-40).join(", ");
+  const neighborhoodStr=neighborhood||"anywhere in NYC or nearby";
+  let prompt;
+  if(type==="food"){
+    const cuisineStr=cuisine||"any cuisine — surprise us";
+    prompt="You are a NYC restaurant and bar expert with deep knowledge of every neighborhood. Suggest ONE specific real restaurant, bar, café, bakery, or food experience matching these criteria:\n- Neighborhood: "+neighborhoodStr+"\n- Cuisine preference: "+cuisineStr+"\n- Time of day: "+(timeOfDay||"any")+"\n- Current weather: "+(weather||"any")+" (suggest cozy/indoor spots for rainy/cold, outdoor/rooftop for sunny/warm)\n- Vibe: "+(vibe||"any")+"\n- Budget: "+(budget||"any")+" (Free=free tastings/events, Under $50=casual, $50-150=mid-range, $150-300=upscale, Splurge=$300+ per person)\n- Duration: "+(duration||"any")+"\n- Season: "+season+"\n- Today: "+today+"\n"+(avoidList?"- AVOID these (already suggested): "+avoidList:"")+"\n\nPick a REAL, currently-operating place. Favor hidden gems, neighborhood favorites, new openings, and spots with character over obvious tourist places. Include specific dishes to order.\n\nRespond with ONLY a JSON object, no markdown, no backticks:\n{\"name\":\"...\",\"desc\":\"One vivid sentence about what makes this place special and what to order\",\"area\":\"Neighborhood\",\"address\":\"Full street address\",\"cat\":\"Food & Drink\",\"priceRange\":\"$/$$/$$$/$$$$\",\"cuisine\":\"Cuisine type\",\"emoji\":\"fitting food/drink emoji\",\"tip\":\"One insider tip for this specific place\"}";
+  } else {
+    const actTypeStr=activityType||"any type of activity or experience";
+    prompt="You are a NYC experiences expert who knows every hidden gem, seasonal event, and unique activity. Suggest ONE specific real activity, experience, or place to visit matching these criteria:\n- Type: "+actTypeStr+"\n- Neighborhood: "+neighborhoodStr+"\n- Time of day: "+(timeOfDay||"any")+"\n- Current weather: "+(weather||"any")+" (suggest indoor activities for rainy/cold, outdoor for sunny)\n- Vibe: "+(vibe||"any")+"\n- Budget: "+(budget||"any")+" (Free, Under $50, $50-150, $150-300, Splurge=$300+)\n- Duration: "+(duration||"any")+"\n- Season: "+season+" (consider seasonal events, holiday activities, weather-appropriate picks)\n- Today: "+today+"\n"+(avoidList?"- AVOID these (already suggested): "+avoidList:"")+"\n\nSuggest a REAL, specific, currently-available experience. This could be a specific museum exhibit, a park activity, a class, a show, an immersive experience, a walking route, a seasonal event, a sporting event, a spa, a day trip — anything that makes for a great date. Be creative and specific. Search for what's currently available.\n\nRespond with ONLY a JSON object, no markdown, no backticks:\n{\"name\":\"...\",\"desc\":\"One vivid sentence about what makes this experience special and why it's great for a date\",\"area\":\"Neighborhood or location\",\"address\":\"Address if applicable, or general area\",\"cat\":\"Activity\",\"emoji\":\"fitting emoji\",\"tip\":\"One insider tip\"}";
+  }
+  try{
+    const resp=await fetch(API_URL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,tools:[{type:"web_search_20250305",name:"web_search"}],messages:[{role:"user",content:prompt}]})});
+    if(!resp.ok)return null;
+    const data=await resp.json();
+    const text=(data.content||[]).map(function(b){return b.text||"";}).join("");
+    const clean=text.replace(/```json|```/g,"").trim();
+    const match=clean.match(/\{[\s\S]*\}/);
+    if(match)return JSON.parse(match[0]);
+  }catch(err){console.error("Engine error:",err);}
+  return null;
+}
+
+async function fetchMultiple(type,filters,count,usedNames){
+  const results=[],allUsed=[].concat(usedNames||[]);
+  for(let i=0;i<count;i++){try{const r=await fetchSuggestion(type,filters,allUsed);if(r&&r.name){results.push(r);allUsed.push(r.name);}}catch(err){console.error(err);}}
+  return results;
+}
+
+// ── FILTERS ──
+const FILTERS_MAIN={
+  category:{label:"What Type",icon:"🎯",options:["Food & Drink","Activities","Surprise Me"]},
+  timeOfDay:{label:"When",icon:"🕐",options:["Morning","Afternoon","Evening","Late Night"]},
+  weather:{label:"Weather",icon:"🌤",options:["Sunny","Hot","Cloudy","Rainy","Snowy","Cold","Windy","Any Weather"]},
+  vibe:{label:"Vibe",icon:"✨",options:["Romantic","Adventurous","Chill","Fancy","Quirky"]},
+  budget:{label:"Budget",icon:"💰",options:["Free","Under $50","$50–150","$150–300","Splurge"]},
+  duration:{label:"How Long",icon:"⏳",options:["Quick (1-2 hrs)","Half Day","Full Day","All Night"]},
+};
+
+// ── COMPONENTS ──
+function Btn({children,primary,small,disabled,style,...props}){
+  return React.createElement("button",Object.assign({},props,{disabled:disabled,style:Object.assign({background:primary?P.grad:"rgba(255,255,255,0.06)",color:primary?"#1a1a2e":P.text,border:primary?"none":"1px solid "+P.border,padding:small?"8px 16px":"14px 32px",borderRadius:"50px",fontSize:small?"13px":"15px",fontWeight:primary?"700":"500",fontFamily:sans,letterSpacing:"0.04em",cursor:disabled?"not-allowed":"pointer",opacity:disabled?0.4:1,transition:"all 0.2s"},style||{})}),children);
+}
+const Chip=({active,children,onClick,small})=>(
+  <button onClick={onClick} style={{background:active?P.grad:P.card,color:active?"#1a1a2e":P.text,border:"1px solid "+(active?"transparent":P.border),padding:small?"7px 12px":"10px 18px",borderRadius:"24px",fontSize:small?"12px":"14px",fontWeight:active?"700":"400",fontFamily:sans,cursor:"pointer",transition:"all 0.2s"}}>{children}</button>
+);
+const DiceFace=({value,size})=>{
+  const s=size||64;
+  const dots={1:[[50,50]],2:[[28,28],[72,72]],3:[[28,28],[50,50],[72,72]],4:[[28,28],[72,28],[28,72],[72,72]],5:[[28,28],[72,28],[50,50],[28,72],[72,72]],6:[[28,28],[72,28],[28,50],[72,50],[28,72],[72,72]]};
+  return(<svg width={s} height={s} viewBox="0 0 100 100"><rect x="2" y="2" width="96" height="96" rx="16" fill="rgba(255,248,235,0.95)" stroke="rgba(180,140,60,0.35)" strokeWidth="2"/>{(dots[value]||dots[1]).map(function(p,i){return <circle key={i} cx={p[0]} cy={p[1]} r="8.5" fill="#1a1a2e"/>;})}</svg>);
+};
+const NavBar=({tab,setTab,historyCount})=>(
+  <div style={{position:"fixed",bottom:0,left:0,right:0,zIndex:100,background:"linear-gradient(transparent, "+P.bg+" 20%)",paddingTop:"28px"}}>
+    <div style={{display:"flex",justifyContent:"center",gap:"4px",background:"rgba(15,15,28,0.92)",backdropFilter:"blur(20px)",borderTop:"1px solid "+P.border,padding:"8px 12px 12px",maxWidth:"480px",margin:"0 auto",borderRadius:"20px 20px 0 0"}}>
+      {[{id:"roll",icon:"🎲",label:"Roll"},{id:"discover",icon:"🔍",label:"Discover"},{id:"calendar",icon:"📅",label:"My Dates"}].map(function(t){return(
+        <button key={t.id} onClick={function(){setTab(t.id);}} style={{flex:1,background:tab===t.id?P.goldDim:"transparent",border:"none",borderRadius:"12px",padding:"8px 4px",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:"2px"}}>
+          <span style={{fontSize:"20px",position:"relative"}}>{t.icon}{t.id==="calendar"&&historyCount>0&&<span style={{position:"absolute",top:"-4px",right:"-8px",background:P.rose,color:"#fff",fontSize:"10px",fontWeight:"700",borderRadius:"50%",width:"16px",height:"16px",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:sans}}>{historyCount}</span>}</span>
+          <span style={{fontSize:"11px",color:tab===t.id?P.gold:P.textDim,fontFamily:sans,fontWeight:"600"}}>{t.label}</span>
+        </button>
+      );})}
+    </div>
+  </div>
+);
+const WeatherBadge=({weather,loading})=>{
+  if(loading)return<div style={{display:"flex",alignItems:"center",gap:"8px",padding:"12px 16px",borderRadius:"14px",background:P.card,border:"1px solid "+P.border,marginBottom:"20px"}}><span style={{fontSize:"20px",animation:"pulse 1s infinite"}}>🌐</span><span style={{fontFamily:sans,fontSize:"13px",color:P.textDim}}>Fetching live NYC weather...</span></div>;
+  if(!weather)return null;
+  return(<div style={{display:"flex",alignItems:"center",gap:"10px",padding:"14px 16px",borderRadius:"14px",background:"linear-gradient(135deg, rgba(232,195,106,0.06), rgba(201,125,74,0.06))",border:"1px solid "+P.goldDim,marginBottom:"20px"}}>
+    <span style={{fontSize:"32px"}}>{weather.wmoIcon}</span>
+    <div style={{flex:1}}>
+      <div style={{fontFamily:sans,fontSize:"14px",color:P.text,fontWeight:"600"}}>{weather.tempF}°F · {weather.classification}</div>
+      <div style={{fontFamily:sans,fontSize:"12px",color:P.textDim,marginTop:"2px"}}>{weather.wmoLabel} · Feels {weather.feelsF}°F · 💨 {weather.windMph}mph · 💧{weather.humidity}%</div>
+      <div style={{fontFamily:sans,fontSize:"11px",color:P.accent,marginTop:"3px"}}>🗓 {getSeason()} · Auto → {weather.autoFilter} · {getTimeOfDay()}</div>
+    </div>
+  </div>);
+};
+const MiniCalendar=({history})=>{
+  const[vd,setVd]=useState(new Date());
+  const y=vd.getFullYear(),m=vd.getMonth(),fd=new Date(y,m,1).getDay(),dim=new Date(y,m+1,0).getDate(),today=new Date();
+  const mn=["January","February","March","April","May","June","July","August","September","October","November","December"];
+  const dm={};history.forEach(function(h){const d=new Date(h.lockedAt||h.completedAt);const k=d.getFullYear()+"-"+d.getMonth()+"-"+d.getDate();if(!dm[k])dm[k]=[];dm[k].push(h);});
+  const cells=[];for(let i=0;i<fd;i++)cells.push(<div key={"e"+i}/>);
+  for(let d=1;d<=dim;d++){const k=y+"-"+m+"-"+d,entries=dm[k]||[],isToday=today.getFullYear()===y&&today.getMonth()===m&&today.getDate()===d;
+    cells.push(<div key={d} style={{textAlign:"center",padding:"6px 2px",borderRadius:"10px",position:"relative",background:isToday?P.goldDim:"transparent",color:entries.length>0?P.gold:P.textDim,fontFamily:sans,fontSize:"13px"}}>{d}{entries.length>0&&<div style={{position:"absolute",bottom:"2px",left:"50%",transform:"translateX(-50%)",display:"flex",gap:"2px"}}>{entries.map(function(_,i){return <div key={i} style={{width:"4px",height:"4px",borderRadius:"50%",background:_.status==="completed"?P.green:P.gold}}/>;})}</div>}</div>);}
+  return(<div>
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"12px"}}><button onClick={function(){setVd(new Date(y,m-1,1));}} style={{background:"none",border:"none",color:P.textDim,fontSize:"18px",cursor:"pointer",padding:"4px 8px"}}>‹</button><span style={{fontFamily:serif,fontSize:"16px",color:P.text}}>{mn[m]} {y}</span><button onClick={function(){setVd(new Date(y,m+1,1));}} style={{background:"none",border:"none",color:P.textDim,fontSize:"18px",cursor:"pointer",padding:"4px 8px"}}>›</button></div>
+    <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:"2px",marginBottom:"4px"}}>{["S","M","T","W","T","F","S"].map(function(d,i){return <div key={i} style={{textAlign:"center",fontSize:"11px",color:P.textDim,fontFamily:sans,fontWeight:"700",padding:"4px"}}>{d}</div>;})}</div>
+    <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:"2px"}}>{cells}</div>
+  </div>);
+};
+
+// ── RESULT CARD ──
+const ResultCard=({result,onReroll,onLockIn,onShare,locked,rolling:isRolling})=>(
+  <div style={{animation:"fadeUp 0.6s ease both"}}>
+    <div style={{background:"linear-gradient(135deg, rgba(232,195,106,0.08), rgba(201,125,74,0.08))",border:"1px solid rgba(232,195,106,0.2)",borderRadius:"20px",padding:"28px 24px",marginBottom:"16px"}}>
+      <div style={{fontSize:"44px",marginBottom:"10px"}}>{result.emoji||"🎲"}</div>
+      <div style={{fontSize:"11px",textTransform:"uppercase",letterSpacing:"0.2em",color:P.accent,marginBottom:"6px",fontFamily:sans}}>
+        {result.cat}{result.cuisine?" · "+result.cuisine:""}{result.priceRange?" · "+result.priceRange:""}
+      </div>
+      <h3 style={{fontSize:"24px",fontWeight:"400",margin:"0 0 6px",color:P.goldBright,fontFamily:serif}}>{result.name}</h3>
+      <div style={{fontSize:"13px",color:P.textDim,marginBottom:"4px",fontFamily:sans}}>📍 {result.area}{result.address&&result.address!==result.area?" — "+result.address:""}</div>
+      <p style={{fontSize:"15px",lineHeight:1.7,color:"rgba(240,236,226,0.8)",margin:"12px 0 0",fontFamily:serif}}>{result.desc}</p>
+      {result.tip&&<p style={{fontSize:"13px",lineHeight:1.6,color:P.accent,margin:"10px 0 0",fontFamily:sans}}>💡 {result.tip}</p>}
+    </div>
+    <div style={{display:"flex",gap:"8px",marginBottom:"8px"}}>
+      <Btn onClick={onReroll} disabled={isRolling} style={{flex:1}}>{isRolling?"Finding...":"🎲 Re-roll"}</Btn>
+      <Btn primary onClick={locked?undefined:onLockIn} style={{flex:1,opacity:locked?0.6:1,cursor:locked?"default":"pointer"}}>{locked?"✓ Locked In":"🔒 Lock It In"}</Btn>
+    </div>
+    <div style={{display:"flex",gap:"8px",flexWrap:"wrap"}}>
+      <Btn small onClick={onShare} style={{flex:"1 1 auto",fontSize:"12px"}}>📤 Share</Btn>
+      <Btn small onClick={function(){window.open("https://www.google.com/search?q="+encodeURIComponent(result.name+(result.address?" "+result.address:" NYC")),"_blank");}} style={{flex:"1 1 auto",fontSize:"12px"}}>🔎 Look Up</Btn>
+      <Btn small onClick={function(){const now=new Date(),s=new Date(now),e=new Date(now);s.setHours(19,0,0,0);e.setHours(22,0,0,0);const fmt=function(d){return d.toISOString().replace(/[-:]/g,"").replace(/\.\d+/,"");};window.open("https://calendar.google.com/calendar/render?action=TEMPLATE&text="+encodeURIComponent("Date Night: "+result.name)+"&dates="+fmt(s)+"/"+fmt(e)+"&details="+encodeURIComponent(result.desc+(result.tip?"\n\nTip: "+result.tip:""))+"&location="+encodeURIComponent((result.address||result.area)+", New York, NY"),"_blank");}} style={{flex:"1 1 auto",fontSize:"12px"}}>📅 Google Cal</Btn>
+    </div>
+  </div>
+);
+
+// ── DISCOVER ──
+const DiscoverScreen=({onPickEvent})=>{
+  const[events,setEvents]=useState([]);const[loading,setLoading]=useState(false);const[searched,setSearched]=useState(false);const[query,setQuery]=useState("tonight");
+  const searchEvents=async function(){setLoading(true);setSearched(true);
+    try{const resp=await fetch(API_URL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,tools:[{type:"web_search_20250305",name:"web_search"}],messages:[{role:"user",content:"Today is "+formatDate(new Date())+". Find 6-8 specific events, shows, exhibitions, pop-ups, concerts happening in New York City "+query+" ("+getDateRangeLabel(query)+"). Search for current real events. For each give name, 1-sentence description, location/neighborhood, category, approximate cost, fitting emoji. Respond ONLY with a JSON array: [{\"name\":\"...\",\"desc\":\"...\",\"area\":\"...\",\"cat\":\"...\",\"cost\":\"...\",\"emoji\":\"...\"}]"}]})});
+      const data=await resp.json();const text=(data.content||[]).map(function(b){return b.text||"";}).join("");const clean=text.replace(/```json|```/g,"").trim();const match=clean.match(/\[[\s\S]*\]/);
+      if(match)setEvents(JSON.parse(match[0]).slice(0,8));else setEvents([]);
+    }catch(err){console.error(err);setEvents([]);}setLoading(false);};
+  return(<div>
+    <h2 style={{fontSize:"24px",fontWeight:"400",margin:"0 0 4px",color:P.gold,fontFamily:serif}}>Discover NYC</h2>
+    <p style={{fontSize:"13px",color:P.textDim,margin:"0 0 6px",fontFamily:sans}}>Live events, shows & pop-ups</p>
+    <p style={{fontSize:"12px",color:P.accent,margin:"0 0 20px",fontFamily:sans}}>📅 {formatDate(new Date())}</p>
+    <div style={{display:"flex",gap:"8px",marginBottom:"20px",flexWrap:"wrap"}}>
+      {["tonight","this week","this weekend","next week"].map(function(q){return(<button key={q} onClick={function(){setQuery(q);}} style={{background:query===q?P.goldDim:P.card,border:"1px solid "+(query===q?"rgba(232,195,106,0.3)":P.border),borderRadius:"20px",padding:"8px 14px",fontSize:"12px",fontFamily:sans,color:query===q?P.gold:P.textDim,cursor:"pointer",textTransform:"capitalize"}}>{q}</button>);})}
+    </div>
+    {query&&<p style={{fontSize:"11px",color:P.textDim,margin:"-12px 0 16px",fontFamily:sans}}>{getDateRangeLabel(query)}</p>}
+    <Btn primary onClick={searchEvents} disabled={loading} style={{width:"100%",marginBottom:"20px"}}>{loading?"Searching NYC...":"🔍 Find Events"}</Btn>
+    {loading&&<div style={{textAlign:"center",padding:"40px 0"}}><div style={{fontSize:"32px",animation:"pulse 1s infinite",marginBottom:"12px"}}>🗽</div><p style={{color:P.textDim,fontFamily:sans,fontSize:"14px"}}>Scouring the city...</p></div>}
+    {!loading&&searched&&events.length===0&&<div style={{textAlign:"center",padding:"40px",color:P.textDim,fontFamily:sans}}>No events found — try another timeframe!</div>}
+    <div style={{display:"flex",flexDirection:"column",gap:"10px"}}>{events.map(function(ev,i){return(
+      <div key={i} onClick={function(){onPickEvent(ev);}} style={{background:P.card,border:"1px solid "+P.border,borderRadius:"16px",padding:"16px 18px",cursor:"pointer",transition:"all 0.2s"}}>
+        <div style={{display:"flex",alignItems:"flex-start",gap:"12px"}}><span style={{fontSize:"28px",flexShrink:0}}>{ev.emoji||"🎉"}</span><div style={{flex:1}}><div style={{fontFamily:sans,fontSize:"15px",color:P.text,fontWeight:"600",marginBottom:"4px"}}>{ev.name}</div><div style={{fontFamily:sans,fontSize:"13px",color:P.textDim,lineHeight:1.5,marginBottom:"6px"}}>{ev.desc}</div><div style={{display:"flex",gap:"8px",flexWrap:"wrap"}}><span style={{fontSize:"11px",fontFamily:sans,color:P.accent}}>📍 {ev.area}</span>{ev.cost&&<span style={{fontSize:"11px",fontFamily:sans,color:P.textDim}}>💰 {ev.cost}</span>}<span style={{fontSize:"11px",fontFamily:sans,color:P.textDim}}>{ev.cat}</span></div></div><span style={{fontSize:"12px",color:P.gold,fontFamily:sans,flexShrink:0}}>Pick →</span></div>
+      </div>);})}</div>
+  </div>);
+};
+
+// ══════════════════════════════════════
+// MAIN APP
+// ══════════════════════════════════════
+function DateDice(){
+  const[screen,setScreen]=useState("home");
+  const[tab,setTab]=useState("roll");
+  const[subScreen,setSubScreen]=useState("filters");
+  const[filters,setFilters]=useState({});
+  const[rolling,setRolling]=useState(false);
+  const[diceVals,setDiceVals]=useState([3,5]);
+  const[result,setResult]=useState(null);
+  const[altResults,setAltResults]=useState([]);
+  const[showAlts,setShowAlts]=useState(false);
+  const[history,setHistory]=useState([]);
+  const[weather,setWeather]=useState(null);
+  const[weatherLoading,setWeatherLoading]=useState(true);
+  const[locked,setLocked]=useState(false);
+  const[toast,setToast]=useState(null);
+  const[usedNames,setUsedNames]=useState([]);
+  const[showNeighborhoods,setShowNeighborhoods]=useState(false);
+  const[showCuisines,setShowCuisines]=useState(false);
+  const[showActivityTypes,setShowActivityTypes]=useState(false);
+  const diceInterval=useRef(null);
+
+  useEffect(function(){setHistory(loadData("datedice:history",[]));setUsedNames(loadData("datedice:used",[]));;},[]);
+  useEffect(function(){
+    (async function(){try{
+      const r=await fetch("https://api.open-meteo.com/v1/forecast?latitude=40.6782&longitude=-73.9442&current=temperature_2m,apparent_temperature,weather_code,relative_humidity_2m,wind_speed_10m,uv_index&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=America/New_York");
+      const d=await r.json();const c=d.current;const wmo=WMO[c.weather_code]||WMO[0];
+      const classification=classifyWeather(c.temperature_2m,c.weather_code,c.relative_humidity_2m,c.wind_speed_10m);
+      const autoFilter=weatherToFilter(classification);
+      setWeather({tempF:Math.round(c.temperature_2m),feelsF:Math.round(c.apparent_temperature),humidity:Math.round(c.relative_humidity_2m),windMph:Math.round(c.wind_speed_10m),wmoLabel:wmo.l,wmoIcon:wmo.i,classification:classification,autoFilter:autoFilter});
+      setFilters(function(f){return Object.assign({},f,{weather:autoFilter,timeOfDay:getTimeOfDay()});});
+    }catch(e){console.error(e);}setWeatherLoading(false);})();
+  },[]);
+
+  const showToast=function(msg){setToast(msg);setTimeout(function(){setToast(null);},2500);};
+
+  const doRoll=useCallback(async function(){
+    setRolling(true);setResult(null);setAltResults([]);setShowAlts(false);setLocked(false);
+    diceInterval.current=setInterval(function(){setDiceVals([Math.ceil(Math.random()*6),Math.ceil(Math.random()*6)]);},100);
+    const cat=filters.category||"Surprise Me";
+    let type;
+    if(cat==="Food & Drink")type="food";
+    else if(cat==="Activities")type="activity";
+    else type=Math.random()>0.45?"food":"activity";
+    try{
+      const results=await fetchMultiple(type,filters,3,usedNames);
+      clearInterval(diceInterval.current);
+      setDiceVals([Math.ceil(Math.random()*6),Math.ceil(Math.random()*6)]);
+      if(results.length>0){
+        setResult(results[0]);setAltResults(results.slice(1));
+        const newUsed=usedNames.concat(results.map(function(r){return r.name;}));
+        setUsedNames(newUsed);saveData("datedice:used",newUsed.slice(-200));
+      } else {
+        setResult({name:"Couldn't find a match",desc:"Try adjusting your filters or being less specific — the city has endless options!",emoji:"🤔",cat:"Oops",area:"NYC"});
+      }
+    }catch(err){
+      console.error(err);clearInterval(diceInterval.current);
+      setResult({name:"Something went wrong",desc:"The search didn't come back. Try rolling again!",emoji:"😅",cat:"Error",area:"NYC"});
+    }
+    setRolling(false);
+  },[filters,usedNames]);
+
+  useEffect(function(){return function(){if(diceInterval.current)clearInterval(diceInterval.current);};},[]);
+
+  const lockIn=function(item){const entry=Object.assign({},item,{id:Date.now().toString(),status:"locked",lockedAt:new Date().toISOString(),rating:null});const next=[entry].concat(history);setHistory(next);saveData("datedice:history",next);setLocked(true);showToast("🔒 Locked in! It's a date.");};
+  const markComplete=function(id,rating){const next=history.map(function(h){return h.id===id?Object.assign({},h,{status:"completed",completedAt:new Date().toISOString(),rating:rating}):h;});setHistory(next);saveData("datedice:history",next);showToast("✓ Date completed!");};
+  const removeEntry=function(id){const next=history.filter(function(h){return h.id!==id;});setHistory(next);saveData("datedice:history",next);showToast("Removed.");};
+  const sharePlan=function(item){const text="🎲 Date Dice picked:\n\n"+(item.emoji||"🎲")+" "+item.name+"\n📍 "+item.area+(item.address&&item.address!==item.area?"\n📫 "+item.address:"")+"\n\n"+item.desc+(item.tip?"\n\n💡 "+item.tip:"")+"\n\nLet's do this! 💛";navigator.clipboard.writeText(text).then(function(){showToast("📋 Copied to clipboard!");}).catch(function(){showToast("Couldn't copy — try long-press");});};
+
+  const filtersSelected=Object.values(filters).filter(Boolean).length;
+  const pageStyle={minHeight:"100vh",background:"radial-gradient(ellipse at 20% 0%,rgba(232,195,106,0.05) 0%,transparent 50%),radial-gradient(ellipse at 80% 100%,rgba(201,125,74,0.05) 0%,transparent 50%),"+P.bg,color:P.text,fontFamily:serif};
+
+  if(screen==="home"){
+    return(<div style={pageStyle}><div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:"100vh",padding:"40px 20px",textAlign:"center"}}>
+      <div style={{fontSize:"72px",marginBottom:"16px",filter:"drop-shadow(0 0 24px rgba(232,195,106,0.3))"}}>🎲</div>
+      <h1 style={{fontSize:"clamp(38px, 8vw, 58px)",fontWeight:"400",letterSpacing:"0.04em",margin:"0 0 8px",background:P.grad,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>Date Dice</h1>
+      <p style={{fontSize:"14px",color:P.textDim,letterSpacing:"0.18em",textTransform:"uppercase",margin:"0 0 8px",fontFamily:sans}}>New York City Edition</p>
+      <p style={{fontSize:"13px",color:P.accent,margin:"0 0 32px",fontFamily:sans}}>📅 {formatDate(new Date())} · {getSeason()}</p>
+      <p style={{fontSize:"17px",lineHeight:1.7,maxWidth:"400px",color:"rgba(240,236,226,0.6)",margin:"0 0 12px"}}>Set your mood. Roll the dice.<br/>Let the city surprise you.</p>
+      <p style={{fontSize:"13px",color:P.textDim,margin:"0 0 40px",fontFamily:sans,maxWidth:"360px"}}>Every roll searches live for real restaurants, activities & experiences across 50+ NYC neighborhoods</p>
+      <Btn primary onClick={function(){setScreen("app");}} style={{padding:"16px 56px",fontSize:"16px",boxShadow:"0 4px 28px rgba(232,195,106,0.3)"}}>Let's Go</Btn>
+      {weather&&<p style={{marginTop:"24px",fontSize:"13px",color:P.textDim,fontFamily:sans}}>{weather.wmoIcon} {weather.tempF}°F · {weather.classification} in Brooklyn</p>}
+      {history.length>0&&<p style={{marginTop:"8px",fontSize:"13px",color:P.textDim,fontFamily:sans}}>{history.filter(function(h){return h.status==="completed";}).length} dates completed · {history.filter(function(h){return h.status==="locked";}).length} upcoming</p>}
+    </div></div>);
+  }
+
+  return(<div style={pageStyle}>
+    {toast&&<div style={{position:"fixed",top:"16px",left:"50%",transform:"translateX(-50%)",zIndex:200,background:"rgba(15,15,28,0.95)",border:"1px solid "+P.goldDim,borderRadius:"14px",padding:"12px 24px",fontFamily:sans,fontSize:"14px",color:P.gold,boxShadow:"0 8px 32px rgba(0,0,0,0.4)",animation:"fadeUp 0.3s ease",backdropFilter:"blur(12px)"}}>{toast}</div>}
+    <div style={{maxWidth:"540px",margin:"0 auto",padding:"24px 20px 100px"}}>
+
+      {tab==="roll"&&subScreen==="filters"&&(<div>
+        <h2 style={{fontSize:"26px",fontWeight:"400",margin:"0 0 4px",color:P.gold}}>Set the Scene</h2>
+        <p style={{fontSize:"13px",color:P.textDim,margin:"0 0 20px",fontFamily:sans}}>Pick what matters — skip what doesn't</p>
+        <WeatherBadge weather={weather} loading={weatherLoading}/>
+        {Object.entries(FILTERS_MAIN).map(function([key,cfg]){return(
+          <div key={key} style={{marginBottom:"22px"}}>
+            <div style={{fontSize:"12px",color:P.textDim,textTransform:"uppercase",letterSpacing:"0.15em",marginBottom:"8px",fontFamily:sans}}>
+              {cfg.icon} {cfg.label}
+              {key==="budget"&&<span style={{color:P.accent,marginLeft:"6px",textTransform:"none",letterSpacing:"0",fontSize:"11px"}}>($150–300 = upscale · Splurge = $300+)</span>}
+            </div>
+            <div style={{display:"flex",flexWrap:"wrap",gap:"8px"}}>
+              {cfg.options.map(function(opt){return <Chip key={opt} active={filters[key]===opt} onClick={function(){setFilters(function(f){const n=Object.assign({},f);if(n[key]===opt)delete n[key];else n[key]=opt;return n;});}}>{opt}</Chip>;})}
+            </div>
+          </div>
+        );})}
+
+        {/* Neighborhood */}
+        <div style={{marginBottom:"22px"}}>
+          <button onClick={function(){setShowNeighborhoods(!showNeighborhoods);}} style={{background:"none",border:"none",padding:0,cursor:"pointer",display:"flex",alignItems:"center",gap:"6px",marginBottom:"8px",width:"100%"}}>
+            <span style={{fontSize:"12px",color:P.textDim,textTransform:"uppercase",letterSpacing:"0.15em",fontFamily:sans}}>📍 Neighborhood</span>
+            {filters.neighborhood&&<span style={{fontSize:"12px",color:P.gold,fontFamily:sans}}>· {filters.neighborhood}</span>}
+            <span style={{fontSize:"10px",color:P.textDim,marginLeft:"auto"}}>{showNeighborhoods?"▴":"▾"}</span>
+          </button>
+          {showNeighborhoods&&(<div>
+            {filters.neighborhood&&<div style={{marginBottom:"8px"}}><Chip small active onClick={function(){setFilters(function(f){const n=Object.assign({},f);delete n.neighborhood;return n;});;}}>✕ Clear</Chip></div>}
+            {Object.entries(NEIGHBORHOODS).map(function([borough,hoods]){return(
+              <div key={borough} style={{marginTop:"10px"}}>
+                <div style={{fontSize:"11px",color:P.accent,fontFamily:sans,fontWeight:"700",marginBottom:"6px"}}>{borough}</div>
+                <div style={{display:"flex",flexWrap:"wrap",gap:"6px"}}>
+                  {hoods.map(function(h){return <Chip key={h} small active={filters.neighborhood===h} onClick={function(){setFilters(function(f){const n=Object.assign({},f);if(n.neighborhood===h)delete n.neighborhood;else n.neighborhood=h;return n;});}}>{h}</Chip>;})}
+                </div>
+              </div>);})}
+          </div>)}
+        </div>
+
+        {/* Cuisine */}
+        {(filters.category==="Food & Drink"||!filters.category||filters.category==="Surprise Me")&&(
+          <div style={{marginBottom:"22px"}}>
+            <button onClick={function(){setShowCuisines(!showCuisines);}} style={{background:"none",border:"none",padding:0,cursor:"pointer",display:"flex",alignItems:"center",gap:"6px",marginBottom:"8px",width:"100%"}}>
+              <span style={{fontSize:"12px",color:P.textDim,textTransform:"uppercase",letterSpacing:"0.15em",fontFamily:sans}}>🍽 Cuisine</span>
+              {filters.cuisine&&<span style={{fontSize:"12px",color:P.gold,fontFamily:sans}}>· {filters.cuisine}</span>}
+              <span style={{fontSize:"10px",color:P.textDim,marginLeft:"auto"}}>{showCuisines?"▴":"▾"}</span>
+            </button>
+            {showCuisines&&(<div>
+              {filters.cuisine&&<div style={{marginBottom:"8px"}}><Chip small active onClick={function(){setFilters(function(f){const n=Object.assign({},f);delete n.cuisine;return n;});}}>✕ Clear</Chip></div>}
+              <div style={{display:"flex",flexWrap:"wrap",gap:"6px"}}>{CUISINES.map(function(c){return <Chip key={c} small active={filters.cuisine===c} onClick={function(){setFilters(function(f){const n=Object.assign({},f);if(n.cuisine===c)delete n.cuisine;else n.cuisine=c;return n;});}}>{c}</Chip>;})}</div>
+            </div>)}
+          </div>
+        )}
+
+        {/* Activity Type */}
+        {(filters.category==="Activities"||!filters.category||filters.category==="Surprise Me")&&(
+          <div style={{marginBottom:"22px"}}>
+            <button onClick={function(){setShowActivityTypes(!showActivityTypes);}} style={{background:"none",border:"none",padding:0,cursor:"pointer",display:"flex",alignItems:"center",gap:"6px",marginBottom:"8px",width:"100%"}}>
+              <span style={{fontSize:"12px",color:P.textDim,textTransform:"uppercase",letterSpacing:"0.15em",fontFamily:sans}}>🎯 Activity Type</span>
+              {filters.activityType&&<span style={{fontSize:"12px",color:P.gold,fontFamily:sans}}>· {filters.activityType}</span>}
+              <span style={{fontSize:"10px",color:P.textDim,marginLeft:"auto"}}>{showActivityTypes?"▴":"▾"}</span>
+            </button>
+            {showActivityTypes&&(<div>
+              {filters.activityType&&<div style={{marginBottom:"8px"}}><Chip small active onClick={function(){setFilters(function(f){const n=Object.assign({},f);delete n.activityType;return n;});}}>✕ Clear</Chip></div>}
+              <div style={{display:"flex",flexWrap:"wrap",gap:"6px"}}>{ACTIVITY_TYPES.map(function(a){return <Chip key={a} small active={filters.activityType===a} onClick={function(){setFilters(function(f){const n=Object.assign({},f);if(n.activityType===a)delete n.activityType;else n.activityType=a;return n;});}}>{a}</Chip>;})}</div>
+            </div>)}
+          </div>
+        )}
+
+        <Btn primary disabled={filtersSelected===0} onClick={function(){setSubScreen("rolling");doRoll();}} style={{width:"100%",padding:"16px",fontSize:"16px",boxShadow:filtersSelected>0?"0 4px 24px rgba(232,195,106,0.3)":"none",marginTop:"8px"}}>
+          🎲 Roll the Dice {filtersSelected>0?"("+filtersSelected+" set)":""}
+        </Btn>
+      </div>)}
+
+      {tab==="roll"&&subScreen==="rolling"&&(<div>
+        <button onClick={function(){setSubScreen("filters");setResult(null);setRolling(false);if(diceInterval.current)clearInterval(diceInterval.current);}} style={{background:"none",border:"none",color:P.textDim,fontSize:"14px",cursor:"pointer",padding:0,marginBottom:"28px",fontFamily:sans}}>← Change Filters</button>
+        <div style={{display:"flex",justifyContent:"center",gap:"20px",marginBottom:"36px",opacity:result?0.3:1,transition:"opacity 0.5s"}}>
+          <div style={{animation:rolling?"diceShake 0.1s infinite":"none"}}><DiceFace value={diceVals[0]} size={68}/></div>
+          <div style={{animation:rolling?"diceShake 0.1s infinite reverse":"none"}}><DiceFace value={diceVals[1]} size={68}/></div>
+        </div>
+        {rolling&&<div style={{textAlign:"center"}}>
+          <p style={{color:P.goldBright,fontSize:"15px",fontStyle:"italic",animation:"pulse 1s infinite"}}>Searching the city for you...</p>
+          <p style={{color:P.textDim,fontSize:"12px",fontFamily:sans,marginTop:"4px"}}>
+            {filters.neighborhood?"In "+filters.neighborhood:"All of NYC"}
+            {filters.cuisine?" · "+filters.cuisine:""}
+            {filters.activityType?" · "+filters.activityType:""}
+          </p>
+        </div>}
+        {result&&!rolling&&(<div>
+          <ResultCard result={result} locked={locked} rolling={rolling} onReroll={function(){setLocked(false);doRoll();}} onLockIn={function(){lockIn(result);}} onShare={function(){sharePlan(result);}}/>
+          {altResults.length>0&&(<div style={{marginTop:"16px"}}>
+            <button onClick={function(){setShowAlts(!showAlts);}} style={{background:"none",border:"none",color:P.textDim,fontSize:"12px",cursor:"pointer",fontFamily:sans,letterSpacing:"0.1em",textTransform:"uppercase",width:"100%",textAlign:"center",padding:"8px 0"}}>{showAlts?"Hide":"Show"} other picks ▾</button>
+            {showAlts&&altResults.map(function(alt,i){return(
+              <div key={i} onClick={function(){setResult(alt);setShowAlts(false);setLocked(false);}} style={{background:P.card,border:"1px solid "+P.border,borderRadius:"14px",padding:"14px 18px",cursor:"pointer",marginTop:"8px",display:"flex",alignItems:"center",gap:"12px"}}>
+                <span style={{fontSize:"26px"}}>{alt.emoji||"🎲"}</span>
+                <div><div style={{color:P.text,fontSize:"14px",fontWeight:"500",fontFamily:sans}}>{alt.name}</div><div style={{color:P.textDim,fontSize:"12px",fontFamily:sans}}>{alt.cuisine||alt.cat} · {alt.area}</div></div>
+              </div>);})}
+          </div>)}
+        </div>)}
+      </div>)}
+
+      {tab==="discover"&&<DiscoverScreen onPickEvent={function(ev){setResult({name:ev.name,desc:ev.desc,area:ev.area,cat:ev.cat||"Event",emoji:ev.emoji||"🎉"});setAltResults([]);setShowAlts(false);setLocked(false);setTab("roll");setSubScreen("rolling");setRolling(false);}}/>}
+
+      {tab==="calendar"&&(<div>
+        <h2 style={{fontSize:"24px",fontWeight:"400",margin:"0 0 4px",color:P.gold}}>My Dates</h2>
+        <p style={{fontSize:"13px",color:P.textDim,margin:"0 0 20px",fontFamily:sans}}>Your date history & upcoming plans</p>
+        <div style={{background:P.card,border:"1px solid "+P.border,borderRadius:"16px",padding:"20px",marginBottom:"24px"}}><MiniCalendar history={history}/></div>
+        {history.length>0&&(<div style={{display:"flex",gap:"8px",marginBottom:"24px"}}>
+          {[{n:history.filter(function(h){return h.status==="locked";}).length,l:"Upcoming",c:P.gold},{n:history.filter(function(h){return h.status==="completed";}).length,l:"Completed",c:P.green},{n:history.length,l:"Total",c:P.blue}].map(function(s,i){return(
+            <div key={i} style={{flex:1,background:P.card,border:"1px solid "+P.border,borderRadius:"14px",padding:"14px",textAlign:"center"}}><div style={{fontSize:"24px",fontWeight:"700",color:s.c,fontFamily:sans}}>{s.n}</div><div style={{fontSize:"11px",color:P.textDim,fontFamily:sans,textTransform:"uppercase",letterSpacing:"0.1em"}}>{s.l}</div></div>
+          );})}
+        </div>)}
+        {history.length===0&&<div style={{textAlign:"center",padding:"40px 20px",color:P.textDim,fontFamily:sans}}><div style={{fontSize:"32px",marginBottom:"12px"}}>🎲</div><p>No dates yet! Roll the dice to get started.</p></div>}
+        <div style={{display:"flex",flexDirection:"column",gap:"10px"}}>
+          {history.map(function(h){return(
+            <div key={h.id} style={{background:P.card,border:"1px solid "+P.border,borderRadius:"16px",padding:"16px 18px"}}>
+              <div style={{display:"flex",alignItems:"flex-start",gap:"12px"}}>
+                <span style={{fontSize:"28px"}}>{h.emoji||"🎉"}</span>
+                <div style={{flex:1}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:"8px"}}><div style={{fontFamily:sans,fontSize:"15px",color:P.text,fontWeight:"600"}}>{h.name}</div><span style={{fontSize:"10px",fontFamily:sans,fontWeight:"700",textTransform:"uppercase",letterSpacing:"0.1em",color:h.status==="completed"?P.green:P.gold,background:h.status==="completed"?"rgba(110,207,148,0.1)":P.goldDim,padding:"4px 10px",borderRadius:"20px",flexShrink:0}}>{h.status==="completed"?"Done":"Upcoming"}</span></div>
+                  <div style={{fontSize:"12px",color:P.textDim,fontFamily:sans,margin:"4px 0"}}>📍 {h.area}{h.address&&h.address!==h.area?" — "+h.address:""} · {new Date(h.lockedAt||h.completedAt).toLocaleDateString()}</div>
+                  {h.rating&&<div style={{fontSize:"13px",marginTop:"4px"}}>{"⭐".repeat(h.rating)}</div>}
+                  <div style={{display:"flex",gap:"6px",marginTop:"10px",flexWrap:"wrap",alignItems:"center"}}>
+                    {h.status==="locked"&&<div style={{display:"flex",gap:"4px",alignItems:"center"}}><span style={{fontSize:"11px",color:P.textDim,fontFamily:sans,marginRight:"2px"}}>Rate:</span>{[1,2,3,4,5].map(function(r){return(<button key={r} onClick={function(){markComplete(h.id,r);}} style={{background:"none",border:"1px solid "+P.border,borderRadius:"6px",padding:"3px 6px",cursor:"pointer",fontSize:"11px",lineHeight:1}}>{"★".repeat(r)}</button>);})}</div>}
+                    <button onClick={function(){removeEntry(h.id);}} style={{background:"none",border:"none",color:P.textDim,fontSize:"12px",cursor:"pointer",fontFamily:sans,marginLeft:"auto"}}>Remove</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );})}
+        </div>
+      </div>)}
+    </div>
+    <NavBar tab={tab} setTab={function(t){setTab(t);if(t==="roll")setSubScreen("filters");}} historyCount={history.filter(function(h){return h.status==="locked";}).length}/>
+  </div>);
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<DateDice/>);
+  </script>
+</body>
+</html>
