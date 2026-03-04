@@ -94,8 +94,16 @@ async function fetchSuggestion(type,filters,usedNames){
 }
 
 async function fetchMultiple(type,filters,count,usedNames){
-  const results=[],allUsed=[].concat(usedNames||[]);
-  for(let i=0;i<count;i++){try{const r=await fetchSuggestion(type,filters,allUsed);if(r&&r.name){results.push(r);allUsed.push(r.name);}}catch(err){console.error(err);}}
+  const promises=[];
+  for(let i=0;i<count;i++){promises.push(fetchSuggestion(type,filters,usedNames));}
+  const settled=await Promise.allSettled(promises);
+  const results=[],seen=new Set((usedNames||[]).map(function(n){return n.toLowerCase();}));
+  settled.forEach(function(s){
+    if(s.status==="fulfilled"&&s.value&&s.value.name){
+      const key=s.value.name.toLowerCase();
+      if(!seen.has(key)){seen.add(key);results.push(s.value);}
+    }
+  });
   return results;
 }
 
