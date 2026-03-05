@@ -202,7 +202,10 @@ async function fetchSuggestion(type,filters,usedNames,signal){
       }
     }
     console.warn("No JSON found in response. Raw text:",rawText.slice(0,300));
-  }catch(err){console.error("Engine error:",err);}
+  }catch(err){
+    if(err&&err.name==='AbortError')throw err; // re-throw so caller can detect abort
+    console.error("Engine error:",err);
+  }
   return null;
 }
 
@@ -380,7 +383,7 @@ const MiniCalendar=({history})=>{
 };
 
 // ── RESULT CARD ──
-const ResultCard=({result,onReroll,onLockIn,onShare,onTweakFilters,locked,rolling:isRolling,altsLoading})=>{
+const ResultCard=({result,onReroll,onLockIn,onShare,onTweakFilters,onLoadAlt,locked,rolling:isRolling,altsLoading})=>{
   const booking=getBookingInfo(result);
   return(
   <div style={{animation:"fadeUp 0.6s ease both"}}>
@@ -423,7 +426,23 @@ const ResultCard=({result,onReroll,onLockIn,onShare,onTweakFilters,locked,rollin
     <button onClick={onTweakFilters} style={{width:"100%",background:"rgba(255,255,255,0.03)",border:"1px solid "+P.border,borderRadius:"12px",padding:"10px",color:P.textDim,fontSize:"13px",fontFamily:sans,cursor:"pointer",transition:"all 0.2s",display:"flex",alignItems:"center",justifyContent:"center",gap:"6px"}}>
       ← Change Filters &amp; Roll Again
     </button>
-    {altsLoading&&<div style={{marginTop:"12px",display:"flex",alignItems:"center",gap:"8px",padding:"10px 14px",borderRadius:"12px",background:P.card,border:"1px solid "+P.border}}><span style={{fontSize:"14px",animation:"spin 1s linear infinite",display:"inline-block"}}>⟳</span><span style={{fontFamily:sans,fontSize:"12px",color:P.textDim}}>Loading alternate picks...</span></div>}
+    {onLoadAlt&&(
+      <button onClick={onLoadAlt} disabled={isRolling||altsLoading} style={{
+        width:"100%",marginTop:"8px",
+        background:"rgba(255,255,255,0.03)",
+        border:"1px dashed rgba(255,255,255,0.1)",
+        borderRadius:"12px",padding:"10px",
+        color:altsLoading?P.gold:P.textDim,
+        fontSize:"13px",fontFamily:sans,
+        cursor:altsLoading?"wait":"pointer",
+        display:"flex",alignItems:"center",justifyContent:"center",gap:"6px",
+        transition:"all 0.2s"
+      }}>
+        {altsLoading
+          ?<><span style={{animation:"spin 1s linear infinite",display:"inline-block",marginRight:"6px"}}>⟳</span>Finding another option...</>
+          :<>✦ Load another option</>}
+      </button>
+    )}
   </div>
   );
 };
@@ -518,26 +537,25 @@ function DateDice(){
   const showToast=function(msg){setToast(msg);setTimeout(function(){setToast(null);},2500);};
 
   const doRoll=useCallback(async function(){
-    // Always read latest values from refs — never stale regardless of when doRoll was created
+    // Read fresh state — never stale because we use refs
     const currentFilters=filtersRef.current;
     const currentUsed=[...usedNamesRef.current];
 
-    // Abort any in-flight network requests from the previous roll immediately
+    // Cancel any previous request immediately
     if(abortRef.current){try{abortRef.current.abort();}catch(e){}}
-    const abortCtrl=new AbortController();
-    abortRef.current=abortCtrl;
+    const ctrl=new AbortController();
+    abortRef.current=ctrl;
 
-    // Cancel dice interval from previous roll
-    if(diceInterval.current){clearInterval(diceInterval.current);diceInterval.current=null;}
-
-    // Increment roll generation so any in-flight alt fetches from a prior roll bail out
+    // Increment generation so any in-progress async work from prior roll bails
     rollCount.current+=1;
     const thisRoll=rollCount.current;
 
+    if(diceInterval.current){clearInterval(diceInterval.current);diceInterval.current=null;}
     setRolling(true);setResult(null);setAltResults([]);setShowAlts(false);setLocked(false);setAltsLoading(false);
 
-    // Start dice animation
-    diceInterval.current=setInterval(function(){setDiceVals([Math.ceil(Math.random()*6),Math.ceil(Math.random()*6)]);},100);
+    diceInterval.current=setInterval(function(){
+      setDiceVals([Math.ceil(Math.random()*6),Math.ceil(Math.random()*6)]);
+    },100);
 
     const cat=currentFilters.category||"Surprise Me";
     let type;
@@ -545,69 +563,73 @@ function DateDice(){
     else if(cat==="Activities")type="activity";
     else type=Math.random()>0.45?"food":"activity";
 
-    try{
-      // ── FAST PATH: fetch 1 result and show it immediately ──
-      const firstResult=await fetchSuggestion(type,currentFilters,currentUsed,abortCtrl.signal);
-
-      // Bail if a newer roll has started while we were waiting
-      if(rollCount.current!==thisRoll)return;
-
-      clearInterval(diceInterval.current);diceInterval.current=null;
+    function stopDice(){
+      if(diceInterval.current){clearInterval(diceInterval.current);diceInterval.current=null;}
       setDiceVals([Math.ceil(Math.random()*6),Math.ceil(Math.random()*6)]);
+    }
+
+    // One fetch only — no background tasks, no concurrent API calls
+    let timeoutId;
+    try{
+      const resultPromise=fetchSuggestion(type,currentFilters,currentUsed,ctrl.signal);
+      const timeoutPromise=new Promise(function(_,rej){
+        timeoutId=setTimeout(function(){rej(new Error("timeout"));},35000);
+      });
+      const res=await Promise.race([resultPromise,timeoutPromise]);
+      clearTimeout(timeoutId);
+
+      if(rollCount.current!==thisRoll)return; // newer roll started while we waited
+      stopDice();
       setRolling(false);
 
-      if(firstResult&&firstResult.name){
-        setResult(firstResult);
-
-        // Add first result to used list
-        const afterFirst=currentUsed.concat([firstResult.name]);
-        usedNamesRef.current=afterFirst;
-        setUsedNames(afterFirst);
-        saveData("datedice:used",afterFirst.slice(-200));
-
-        // ── SEQUENTIAL ALTS: fetch one at a time so we never hit Cloudflare's timeout ──
-        setAltsLoading(true);
-        (async function(){
-          const collected=[];
-          const seen=new Set(afterFirst.map(function(n){return n.toLowerCase();}));
-          for(let i=0;i<2;i++){
-            if(rollCount.current!==thisRoll)break; // newer roll started, stop
-            try{
-              const alt=await fetchSuggestion(type,currentFilters,afterFirst.concat(collected.map(function(r){return r.name;})),abortCtrl.signal);
-              if(rollCount.current!==thisRoll)break;
-              if(alt&&alt.name&&!seen.has(alt.name.toLowerCase())){
-                seen.add(alt.name.toLowerCase());
-                collected.push(alt);
-                // Show each alt as it arrives
-                setAltResults(function(prev){return prev.concat([alt]);});
-              }
-            }catch(e){console.error("Alt fetch error:",e);}
-          }
-          if(rollCount.current===thisRoll){
-            setAltsLoading(false);
-            if(collected.length>0){
-              const afterAlts=afterFirst.concat(collected.map(function(r){return r.name;}));
-              usedNamesRef.current=afterAlts;
-              setUsedNames(afterAlts);
-              saveData("datedice:used",afterAlts.slice(-200));
-            }
-          }
-        })();
-
-      } else {
-        setAltsLoading(false);
-        setResult({name:"Couldn't find a match",desc:"Try adjusting your filters or being less specific — the city has endless options!",emoji:"🤔",cat:"Oops",area:"NYC"});
+      if(res&&res.name){
+        const newUsed=currentUsed.concat([res.name]);
+        usedNamesRef.current=newUsed;
+        setUsedNames(newUsed);
+        saveData("datedice:used",newUsed.slice(-200));
+        setResult(res);
+      }else{
+        setResult({name:"No match found",desc:"Try changing your filters or rolling again — the city has endless options!",emoji:"🤔",cat:"Try Again",area:"NYC"});
       }
     }catch(err){
+      clearTimeout(timeoutId);
       if(rollCount.current!==thisRoll)return;
-      if(err&&(err.name==="AbortError"||err.message==="signal is aborted without reason"))return;
-      console.error("doRoll error:",err);
-      if(diceInterval.current){clearInterval(diceInterval.current);diceInterval.current=null;}
+      stopDice();
       setRolling(false);
-      setAltsLoading(false);
-      setResult({name:"Something went wrong",desc:"The search didn't come back. Try rolling again!",emoji:"😅",cat:"Error",area:"NYC"});
+      if(err&&err.name==="AbortError")return; // new roll is already running — it will show its result
+      if(err&&err.message==="timeout"){
+        setResult({name:"Search timed out",desc:"The request took too long — tap Re-roll to try again!",emoji:"⏱",cat:"Timeout",area:"NYC"});
+        return;
+      }
+      console.error("doRoll:",err);
+      setResult({name:"Something went wrong",desc:"Couldn't reach the search. Check your connection and try again!",emoji:"😅",cat:"Error",area:"NYC"});
     }
   },[]);
+  // Load one additional option on demand — fires only when user clicks, never during a roll
+  const loadAlt=useCallback(async function(){
+    if(rolling)return;
+    const currentFilters=filtersRef.current;
+    const allUsed=[...usedNamesRef.current];
+    const thisRoll=rollCount.current;
+    const cat=currentFilters.category||"Surprise Me";
+    let type;
+    if(cat==="Food & Drink")type="food";
+    else if(cat==="Activities")type="activity";
+    else type=Math.random()>0.45?"food":"activity";
+    setAltsLoading(true);
+    try{
+      const alt=await fetchSuggestion(type,currentFilters,allUsed);
+      if(rollCount.current!==thisRoll){setAltsLoading(false);return;}
+      if(alt&&alt.name){
+        const newUsed=allUsed.concat([alt.name]);
+        usedNamesRef.current=newUsed;
+        setUsedNames(newUsed);
+        saveData("datedice:used",newUsed.slice(-200));
+        setAltResults(function(prev){return prev.concat([alt]);});
+      }
+    }catch(e){if(e&&e.name!=="AbortError")console.error("loadAlt:",e);}
+    setAltsLoading(false);
+  },[rolling]);
 
   const lockIn=function(item){const entry=Object.assign({},item,{id:Date.now().toString(),status:"locked",lockedAt:new Date().toISOString(),rating:null});const next=[entry].concat(history);setHistory(next);saveData("datedice:history",next);setLocked(true);showToast("🔒 Locked in! It's a date.");};
   const markComplete=function(id,rating){const next=history.map(function(h){return h.id===id?Object.assign({},h,{status:"completed",completedAt:new Date().toISOString(),rating:rating}):h;});setHistory(next);saveData("datedice:history",next);showToast("✓ Date completed!");};
@@ -722,8 +744,9 @@ function DateDice(){
 
         {tab==="roll"&&subScreen==="rolling"&&(<div>
           <button onClick={function(){
-            setSubScreen("filters");setResult(null);setRolling(false);setAltsLoading(false);
+            if(abortRef.current){try{abortRef.current.abort();}catch(e){}}
             if(diceInterval.current){clearInterval(diceInterval.current);diceInterval.current=null;}
+            setSubScreen("filters");setResult(null);setRolling(false);setAltsLoading(false);
           }} style={{display:"inline-flex",alignItems:"center",gap:"6px",background:"rgba(255,255,255,0.05)",border:"1px solid "+P.border,borderRadius:"20px",padding:"8px 16px",color:P.textDim,fontSize:"13px",fontFamily:sans,cursor:"pointer",marginBottom:"28px",transition:"all 0.2s"}}>
             ← Change Filters {activeFilterCount>0&&<span style={{background:P.goldDim,color:P.gold,borderRadius:"10px",padding:"1px 7px",fontSize:"11px",fontWeight:"700"}}>{activeFilterCount} set</span>}
           </button>
@@ -742,6 +765,7 @@ function DateDice(){
           {result&&!rolling&&(<div>
             <ResultCard result={result} locked={locked} rolling={rolling} altsLoading={altsLoading}
               onReroll={function(){setLocked(false);setAltResults([]);setShowAlts(false);doRoll();}}
+              onLoadAlt={loadAlt}
               onLockIn={function(){lockIn(result);}}
               onShare={function(){sharePlan(result);}}
               onTweakFilters={function(){setSubScreen("filters");setResult(null);setRolling(false);setAltsLoading(false);if(diceInterval.current){clearInterval(diceInterval.current);diceInterval.current=null;}}}
