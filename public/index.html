@@ -120,6 +120,41 @@ function cleanResult(obj){
   return out;
 }
 
+// Build the best booking URL we can, using model-provided URL or smart fallback
+function getBookingInfo(result){
+  const name=result.name||"";
+  const platform=(result.bookingPlatform||"").toLowerCase();
+
+  // If model gave us a real URL, use it
+  const modelUrl=result.bookingUrl||"";
+  const isRealUrl=modelUrl.startsWith("http")&&modelUrl.length>12;
+
+  if(isRealUrl){
+    const label=platform==="resy"?"Reserve on Resy":
+                platform==="opentable"?"Reserve on OpenTable":
+                platform==="tock"?"Reserve on Tock":
+                platform==="eventbrite"?"Tickets on Eventbrite":
+                platform==="ticketmaster"?"Tickets on Ticketmaster":
+                platform==="walkin"?null:
+                platform==="noreservation"?null:
+                "Book / Reserve";
+    return label?{url:modelUrl,label,platform}:null;
+  }
+
+  // No URL from model — build smart search fallbacks for restaurants
+  if(result.cat==="Food & Drink"||result.cat==="food"){
+    const q=encodeURIComponent(name+" NYC");
+    // Offer OpenTable search as the most universal fallback
+    return{
+      url:"https://www.opentable.com/s?term="+q,
+      label:"Find on OpenTable",
+      platform:"opentable",
+      isFallback:true
+    };
+  }
+  return null;
+}
+
 async function fetchSuggestion(type,filters,usedNames){
   const{timeOfDay,weather,vibe,budget,duration,neighborhood,cuisine,activityType}=filters;
   const season=getSeason(),today=formatDate(new Date());
@@ -130,10 +165,10 @@ async function fetchSuggestion(type,filters,usedNames){
   let prompt;
   if(type==="food"){
     const cuisineStr=cuisine||"any cuisine — surprise us";
-    prompt="You are a NYC restaurant and bar expert with deep knowledge of every neighborhood. Suggest ONE specific real restaurant, bar, café, bakery, or food experience matching these criteria:\n- Neighborhood: "+neighborhoodStr+"\n- Cuisine preference: "+cuisineStr+"\n- Time of day: "+(timeOfDay||"any")+"\n- Current weather: "+(weather||"any")+" (suggest cozy/indoor spots for rainy/cold, outdoor/rooftop for sunny/warm)\n- Vibe: "+(vibe||"any")+"\n- Budget: "+(budget||"any")+" (Free=free tastings/events, Under $50=casual, $50-150=mid-range, $150-300=upscale, Splurge=$300+ per person)\n- Duration: "+(duration||"any")+"\n- Season: "+season+"\n- Today: "+today+"\n"+(avoidList?"- AVOID these (already suggested): "+avoidList:"")+"\n\nPick a REAL, currently-operating place. Favor hidden gems, neighborhood favorites, new openings, and spots with character over obvious tourist places. Include specific dishes to order."+jsonWarning+"\n{\"name\":\"...\",\"desc\":\"One vivid sentence about what makes this place special and what to order\",\"area\":\"Neighborhood\",\"address\":\"Full street address\",\"cat\":\"Food & Drink\",\"priceRange\":\"$/$$/$$$/$$$$\",\"cuisine\":\"Cuisine type\",\"emoji\":\"fitting food/drink emoji\",\"tip\":\"One insider tip for this specific place\"}";
+    prompt="You are a NYC restaurant and bar expert with deep knowledge of every neighborhood. Suggest ONE specific real restaurant, bar, café, bakery, or food experience matching these criteria:\n- Neighborhood: "+neighborhoodStr+"\n- Cuisine preference: "+cuisineStr+"\n- Time of day: "+(timeOfDay||"any")+"\n- Current weather: "+(weather||"any")+" (suggest cozy/indoor spots for rainy/cold, outdoor/rooftop for sunny/warm)\n- Vibe: "+(vibe||"any")+"\n- Budget: "+(budget||"any")+" (Free=free tastings/events, Under $50=casual, $50-150=mid-range, $150-300=upscale, Splurge=$300+ per person)\n- Duration: "+(duration||"any")+"\n- Season: "+season+"\n- Today: "+today+"\n"+(avoidList?"- AVOID these (already suggested): "+avoidList:"")+"\n\nPick a REAL, currently-operating place. Favor hidden gems, neighborhood favorites, new openings, and spots with character over obvious tourist places. Include specific dishes to order.\n\nFor bookingUrl: search for the restaurant's actual reservation page. Check if they use Resy (resy.com), OpenTable (opentable.com), Tock (exploretock.com), or their own website for reservations. Provide the direct booking URL if you can find it, otherwise provide their website URL, otherwise leave as empty string."+jsonWarning+"\n{\"name\":\"...\",\"desc\":\"One vivid sentence about what makes this place special and what to order\",\"area\":\"Neighborhood\",\"address\":\"Full street address\",\"cat\":\"Food & Drink\",\"priceRange\":\"$/$$/$$$/$$$$\",\"cuisine\":\"Cuisine type\",\"emoji\":\"fitting food/drink emoji\",\"tip\":\"One insider tip for this specific place\",\"bookingUrl\":\"direct URL to reservations or website, empty string if unknown\",\"bookingPlatform\":\"Resy|OpenTable|Tock|Website|WalkIn|empty string\"}";
   } else {
     const actTypeStr=activityType||"any type of activity or experience";
-    prompt="You are a NYC experiences expert who knows every hidden gem, seasonal event, and unique activity. Suggest ONE specific real activity, experience, or place to visit matching these criteria:\n- Type: "+actTypeStr+"\n- Neighborhood: "+neighborhoodStr+"\n- Time of day: "+(timeOfDay||"any")+"\n- Current weather: "+(weather||"any")+" (suggest indoor activities for rainy/cold, outdoor for sunny)\n- Vibe: "+(vibe||"any")+"\n- Budget: "+(budget||"any")+" (Free, Under $50, $50-150, $150-300, Splurge=$300+)\n- Duration: "+(duration||"any")+"\n- Season: "+season+" (consider seasonal events, holiday activities, weather-appropriate picks)\n- Today: "+today+"\n"+(avoidList?"- AVOID these (already suggested): "+avoidList:"")+"\n\nSuggest a REAL, specific, currently-available experience. This could be a specific museum exhibit, a park activity, a class, a show, an immersive experience, a walking route, a seasonal event, a sporting event, a spa, a day trip — anything that makes for a great date. Be creative and specific. Search for what's currently available."+jsonWarning+"\n{\"name\":\"...\",\"desc\":\"One vivid sentence about what makes this experience special and why it's great for a date\",\"area\":\"Neighborhood or location\",\"address\":\"Address if applicable, or general area\",\"cat\":\"Activity\",\"emoji\":\"fitting emoji\",\"tip\":\"One insider tip\"}";
+    prompt="You are a NYC experiences expert who knows every hidden gem, seasonal event, and unique activity. Suggest ONE specific real activity, experience, or place to visit matching these criteria:\n- Type: "+actTypeStr+"\n- Neighborhood: "+neighborhoodStr+"\n- Time of day: "+(timeOfDay||"any")+"\n- Current weather: "+(weather||"any")+" (suggest indoor activities for rainy/cold, outdoor for sunny)\n- Vibe: "+(vibe||"any")+"\n- Budget: "+(budget||"any")+" (Free, Under $50, $50-150, $150-300, Splurge=$300+)\n- Duration: "+(duration||"any")+"\n- Season: "+season+" (consider seasonal events, holiday activities, weather-appropriate picks)\n- Today: "+today+"\n"+(avoidList?"- AVOID these (already suggested): "+avoidList:"")+"\n\nSuggest a REAL, specific, currently-available experience. This could be a specific museum exhibit, a park activity, a class, a show, an immersive experience, a walking route, a seasonal event, a sporting event, a spa, a day trip — anything that makes for a great date. Be creative and specific. Search for what's currently available.\n\nFor bookingUrl: search for the venue or event's actual ticket/booking page. Check Eventbrite, the venue's own website, or specific booking platforms. Provide the direct booking URL if you can find it, otherwise their main website, otherwise empty string."+jsonWarning+"\n{\"name\":\"...\",\"desc\":\"One vivid sentence about what makes this experience special and why it's great for a date\",\"area\":\"Neighborhood or location\",\"address\":\"Address if applicable, or general area\",\"cat\":\"Activity\",\"emoji\":\"fitting emoji\",\"tip\":\"One insider tip\",\"bookingUrl\":\"direct URL to tickets/booking or website, empty string if not applicable\",\"bookingPlatform\":\"Eventbrite|Website|Ticketmaster|NoReservation|empty string\"}";
   }
   try{
     const resp=await fetch(API_URL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-6",max_tokens:1000,tools:[{type:"web_search_20250305",name:"web_search"}],messages:[{role:"user",content:prompt}]})});
@@ -337,7 +372,9 @@ const MiniCalendar=({history})=>{
 };
 
 // ── RESULT CARD ──
-const ResultCard=({result,onReroll,onLockIn,onShare,locked,rolling:isRolling,altsLoading})=>(
+const ResultCard=({result,onReroll,onLockIn,onShare,onTweakFilters,locked,rolling:isRolling,altsLoading})=>{
+  const booking=getBookingInfo(result);
+  return(
   <div style={{animation:"fadeUp 0.6s ease both"}}>
     <div style={{background:"linear-gradient(135deg, rgba(232,195,106,0.08), rgba(201,125,74,0.08))",border:"1px solid rgba(232,195,106,0.2)",borderRadius:"20px",padding:"28px 24px",marginBottom:"16px"}}>
       <div style={{fontSize:"44px",marginBottom:"10px"}}>{result.emoji||"🎲"}</div>
@@ -349,18 +386,39 @@ const ResultCard=({result,onReroll,onLockIn,onShare,locked,rolling:isRolling,alt
       <p style={{fontSize:"15px",lineHeight:1.7,color:"rgba(240,236,226,0.8)",margin:"12px 0 0",fontFamily:serif}}>{result.desc}</p>
       {result.tip&&<p style={{fontSize:"13px",lineHeight:1.6,color:P.accent,margin:"10px 0 0",fontFamily:sans}}>💡 {result.tip}</p>}
     </div>
+
+    {/* Reserve / Book button — shown prominently when available */}
+    {booking&&(
+      <div style={{marginBottom:"8px"}}>
+        <button onClick={function(){window.open(booking.url,"_blank");}} style={{
+          width:"100%",display:"flex",alignItems:"center",justifyContent:"center",gap:"8px",
+          background:"linear-gradient(135deg, rgba(110,207,148,0.15), rgba(106,175,232,0.15))",
+          border:"1px solid rgba(110,207,148,0.35)",borderRadius:"14px",padding:"14px 20px",
+          color:"#6ecf94",fontSize:"15px",fontWeight:"600",fontFamily:sans,cursor:"pointer",transition:"all 0.2s"
+        }}>
+          <span style={{fontSize:"18px"}}>🗓</span>
+          {booking.label}
+          {booking.isFallback&&<span style={{fontSize:"11px",opacity:0.6,fontWeight:"400"}}>(search)</span>}
+        </button>
+      </div>
+    )}
+
     <div style={{display:"flex",gap:"8px",marginBottom:"8px"}}>
       <Btn onClick={onReroll} disabled={isRolling} style={{flex:1}}>{isRolling?"Finding...":"🎲 Re-roll"}</Btn>
       <Btn primary onClick={locked?undefined:onLockIn} style={{flex:1,opacity:locked?0.6:1,cursor:locked?"default":"pointer"}}>{locked?"✓ Locked In":"🔒 Lock It In"}</Btn>
     </div>
-    <div style={{display:"flex",gap:"8px",flexWrap:"wrap"}}>
+    <div style={{display:"flex",gap:"8px",flexWrap:"wrap",marginBottom:"8px"}}>
       <Btn small onClick={onShare} style={{flex:"1 1 auto",fontSize:"12px"}}>📤 Share</Btn>
       <Btn small onClick={function(){window.open("https://www.google.com/search?q="+encodeURIComponent(result.name+(result.address?" "+result.address:" NYC")),"_blank");}} style={{flex:"1 1 auto",fontSize:"12px"}}>🔎 Look Up</Btn>
       <Btn small onClick={function(){const now=new Date(),s=new Date(now),e=new Date(now);s.setHours(19,0,0,0);e.setHours(22,0,0,0);const fmt=function(d){return d.toISOString().replace(/[-:]/g,"").replace(/\.\d+/,"");};window.open("https://calendar.google.com/calendar/render?action=TEMPLATE&text="+encodeURIComponent("Date Night: "+result.name)+"&dates="+fmt(s)+"/"+fmt(e)+"&details="+encodeURIComponent(result.desc+(result.tip?"\n\nTip: "+result.tip:""))+"&location="+encodeURIComponent((result.address||result.area)+", New York, NY"),"_blank");}} style={{flex:"1 1 auto",fontSize:"12px"}}>📅 Google Cal</Btn>
     </div>
+    <button onClick={onTweakFilters} style={{width:"100%",background:"rgba(255,255,255,0.03)",border:"1px solid "+P.border,borderRadius:"12px",padding:"10px",color:P.textDim,fontSize:"13px",fontFamily:sans,cursor:"pointer",transition:"all 0.2s",display:"flex",alignItems:"center",justifyContent:"center",gap:"6px"}}>
+      ← Change Filters &amp; Roll Again
+    </button>
     {altsLoading&&<div style={{marginTop:"12px",display:"flex",alignItems:"center",gap:"8px",padding:"10px 14px",borderRadius:"12px",background:P.card,border:"1px solid "+P.border}}><span style={{fontSize:"14px",animation:"spin 1s linear infinite",display:"inline-block"}}>⟳</span><span style={{fontFamily:sans,fontSize:"12px",color:P.textDim}}>Loading alternate picks...</span></div>}
   </div>
-);
+  );
+};
 
 // ── DISCOVER ──
 const DiscoverScreen=({onPickEvent})=>{
@@ -412,7 +470,12 @@ function DateDice(){
   const[showCuisines,setShowCuisines]=useState(false);
   const[showActivityTypes,setShowActivityTypes]=useState(false);
   const diceInterval=useRef(null);
-  const rollCount=useRef(0); // track roll generation to avoid stale async updates
+  const rollCount=useRef(0);
+  // Always-fresh refs so doRoll never reads stale closure values
+  const filtersRef=useRef(filters);
+  const usedNamesRef=useRef(usedNames);
+  useEffect(function(){filtersRef.current=filters;},[filters]);
+  useEffect(function(){usedNamesRef.current=usedNames;},[usedNames]);
 
   useEffect(function(){setHistory(loadData("datedice:history",[]));setUsedNames(loadData("datedice:used",[]));;},[]);
   useEffect(function(){
@@ -432,10 +495,14 @@ function DateDice(){
   const showToast=function(msg){setToast(msg);setTimeout(function(){setToast(null);},2500);};
 
   const doRoll=useCallback(async function(){
+    // Always read latest values from refs — never stale regardless of when doRoll was created
+    const currentFilters=filtersRef.current;
+    const currentUsed=[...usedNamesRef.current];
+
     // Cancel any in-flight interval from a previous roll
     if(diceInterval.current){clearInterval(diceInterval.current);diceInterval.current=null;}
 
-    // Increment roll generation counter to invalidate stale async results
+    // Increment roll generation so any in-flight alt fetches from a prior roll bail out
     rollCount.current+=1;
     const thisRoll=rollCount.current;
 
@@ -444,20 +511,17 @@ function DateDice(){
     // Start dice animation
     diceInterval.current=setInterval(function(){setDiceVals([Math.ceil(Math.random()*6),Math.ceil(Math.random()*6)]);},100);
 
-    const cat=filters.category||"Surprise Me";
+    const cat=currentFilters.category||"Surprise Me";
     let type;
     if(cat==="Food & Drink")type="food";
     else if(cat==="Activities")type="activity";
     else type=Math.random()>0.45?"food":"activity";
 
-    // Capture used names at time of roll (stable ref for this roll's async work)
-    const currentUsed=[...usedNames];
-
     try{
       // ── FAST PATH: fetch 1 result and show it immediately ──
-      const firstResult=await fetchSuggestion(type,filters,currentUsed);
+      const firstResult=await fetchSuggestion(type,currentFilters,currentUsed);
 
-      // Bail if a newer roll has started
+      // Bail if a newer roll has started while we were waiting
       if(rollCount.current!==thisRoll)return;
 
       clearInterval(diceInterval.current);diceInterval.current=null;
@@ -466,39 +530,55 @@ function DateDice(){
 
       if(firstResult&&firstResult.name){
         setResult(firstResult);
-        const updatedUsed=currentUsed.concat([firstResult.name]);
 
-        // Update global used-names state
-        setUsedNames(updatedUsed);
-        saveData("datedice:used",updatedUsed.slice(-200));
+        // Add first result to used list
+        const afterFirst=currentUsed.concat([firstResult.name]);
+        usedNamesRef.current=afterFirst;
+        setUsedNames(afterFirst);
+        saveData("datedice:used",afterFirst.slice(-200));
 
-        // ── BACKGROUND: fetch 2 alternates without blocking UI ──
+        // ── SEQUENTIAL ALTS: fetch one at a time so we never hit Cloudflare's timeout ──
         setAltsLoading(true);
-        fetchMultiple(type,filters,2,updatedUsed).then(function(alts){
-          if(rollCount.current!==thisRoll)return; // stale, discard
-          setAltResults(alts);
-          setAltsLoading(false);
-          if(alts.length>0){
-            setUsedNames(function(prev){
-              const next=prev.concat(alts.map(function(r){return r.name;}));
-              saveData("datedice:used",next.slice(-200));
-              return next;
-            });
+        (async function(){
+          const collected=[];
+          const seen=new Set(afterFirst.map(function(n){return n.toLowerCase();}));
+          for(let i=0;i<2;i++){
+            if(rollCount.current!==thisRoll)break; // newer roll started, stop
+            try{
+              const alt=await fetchSuggestion(type,currentFilters,afterFirst.concat(collected.map(function(r){return r.name;})));
+              if(rollCount.current!==thisRoll)break;
+              if(alt&&alt.name&&!seen.has(alt.name.toLowerCase())){
+                seen.add(alt.name.toLowerCase());
+                collected.push(alt);
+                // Show each alt as it arrives
+                setAltResults(function(prev){return prev.concat([alt]);});
+              }
+            }catch(e){console.error("Alt fetch error:",e);}
           }
-        }).catch(function(){
-          if(rollCount.current===thisRoll)setAltsLoading(false);
-        });
+          if(rollCount.current===thisRoll){
+            setAltsLoading(false);
+            if(collected.length>0){
+              const afterAlts=afterFirst.concat(collected.map(function(r){return r.name;}));
+              usedNamesRef.current=afterAlts;
+              setUsedNames(afterAlts);
+              saveData("datedice:used",afterAlts.slice(-200));
+            }
+          }
+        })();
+
       } else {
+        setAltsLoading(false);
         setResult({name:"Couldn't find a match",desc:"Try adjusting your filters or being less specific — the city has endless options!",emoji:"🤔",cat:"Oops",area:"NYC"});
       }
     }catch(err){
       if(rollCount.current!==thisRoll)return;
-      console.error(err);
+      console.error("doRoll error:",err);
       if(diceInterval.current){clearInterval(diceInterval.current);diceInterval.current=null;}
       setRolling(false);
+      setAltsLoading(false);
       setResult({name:"Something went wrong",desc:"The search didn't come back. Try rolling again!",emoji:"😅",cat:"Error",area:"NYC"});
     }
-  },[filters,usedNames]);
+  },[]);
 
   const lockIn=function(item){const entry=Object.assign({},item,{id:Date.now().toString(),status:"locked",lockedAt:new Date().toISOString(),rating:null});const next=[entry].concat(history);setHistory(next);saveData("datedice:history",next);setLocked(true);showToast("🔒 Locked in! It's a date.");};
   const markComplete=function(id,rating){const next=history.map(function(h){return h.id===id?Object.assign({},h,{status:"completed",completedAt:new Date().toISOString(),rating:rating}):h;});setHistory(next);saveData("datedice:history",next);showToast("✓ Date completed!");};
@@ -607,7 +687,12 @@ function DateDice(){
         </div>)}
 
         {tab==="roll"&&subScreen==="rolling"&&(<div>
-          <button onClick={function(){setSubScreen("filters");setResult(null);setRolling(false);setAltsLoading(false);if(diceInterval.current){clearInterval(diceInterval.current);diceInterval.current=null;}}} style={{background:"none",border:"none",color:P.textDim,fontSize:"14px",cursor:"pointer",padding:0,marginBottom:"28px",fontFamily:sans}}>← Change Filters</button>
+          <button onClick={function(){
+            setSubScreen("filters");setResult(null);setRolling(false);setAltsLoading(false);
+            if(diceInterval.current){clearInterval(diceInterval.current);diceInterval.current=null;}
+          }} style={{display:"inline-flex",alignItems:"center",gap:"6px",background:"rgba(255,255,255,0.05)",border:"1px solid "+P.border,borderRadius:"20px",padding:"8px 16px",color:P.textDim,fontSize:"13px",fontFamily:sans,cursor:"pointer",marginBottom:"28px",transition:"all 0.2s"}}>
+            ← Change Filters {activeFilterCount>0&&<span style={{background:P.goldDim,color:P.gold,borderRadius:"10px",padding:"1px 7px",fontSize:"11px",fontWeight:"700"}}>{activeFilterCount} set</span>}
+          </button>
           <div style={{display:"flex",justifyContent:"center",gap:"32px",marginBottom:"40px",opacity:result?0.2:1,transition:"opacity 0.7s"}}>
             <Dice3D value={diceVals[0]} rolling={rolling} size={82}/>
             <Dice3D value={diceVals[1]} rolling={rolling} size={82}/>
@@ -621,7 +706,12 @@ function DateDice(){
             </p>
           </div>}
           {result&&!rolling&&(<div>
-            <ResultCard result={result} locked={locked} rolling={rolling} altsLoading={altsLoading} onReroll={function(){setLocked(false);setAltResults([]);setShowAlts(false);doRoll();}} onLockIn={function(){lockIn(result);}} onShare={function(){sharePlan(result);}}/>
+            <ResultCard result={result} locked={locked} rolling={rolling} altsLoading={altsLoading}
+              onReroll={function(){setLocked(false);setAltResults([]);setShowAlts(false);doRoll();}}
+              onLockIn={function(){lockIn(result);}}
+              onShare={function(){sharePlan(result);}}
+              onTweakFilters={function(){setSubScreen("filters");setResult(null);setRolling(false);setAltsLoading(false);if(diceInterval.current){clearInterval(diceInterval.current);diceInterval.current=null;}}}
+            />
             {altResults.length>0&&(<div style={{marginTop:"16px"}}>
               <button onClick={function(){setShowAlts(!showAlts);}} style={{background:"none",border:"none",color:P.textDim,fontSize:"12px",cursor:"pointer",fontFamily:sans,letterSpacing:"0.1em",textTransform:"uppercase",width:"100%",textAlign:"center",padding:"8px 0"}}>{showAlts?"Hide":"Show"} other picks ▾</button>
               {showAlts&&altResults.map(function(alt,i){return(
