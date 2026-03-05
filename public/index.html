@@ -459,8 +459,8 @@ const ResultCard=({result,onReroll,onLockIn,onShare,onTweakFilters,onLoadAlt,loc
         transition:"all 0.2s"
       }}>
         {altsLoading
-          ?<><span style={{animation:"spin 1s linear infinite",display:"inline-block",marginRight:"6px"}}>⟳</span>Finding another option...</>
-          :<>✦ Load another option</>}
+          ?<span><span style={{animation:"spin 1s linear infinite",display:"inline-block",marginRight:"6px"}}>⟳</span> Finding another option...</span>
+          :<span>✦ Load another option</span>}
       </button>
     )}
   </div>
