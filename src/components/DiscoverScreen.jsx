@@ -70,7 +70,7 @@ export default function DiscoverScreen() {
           tools: [{ type: "web_search_20250305", name: "web_search" }],
           messages: [{
             role: "user",
-            content: "Today is " + formatDate(new Date()) + ". Search the web for NYC events and list exactly 5 specific events, shows, exhibits, performances, or experiences happening " + query + " (" + getDateRangeLabel(query) + "). Include a mix: theater/shows, museum exhibits, live music, and seasonal events for " + getSeason() + ". You MUST return exactly 5 items. Respond ONLY with a raw JSON array, no markdown, no backticks: [{\"name\":\"...\",\"desc\":\"One sentence description\",\"area\":\"Neighborhood\",\"cat\":\"Category\",\"cost\":\"Price or Free\",\"emoji\":\"...\"}]",
+            content: "Today is " + formatDate(new Date()) + ". Search the web for NYC events and list exactly 5 specific events, shows, exhibits, performances, or experiences happening " + query + " (" + getDateRangeLabel(query) + "). Include a mix: theater/shows, museum exhibits, live music, and seasonal events for " + getSeason() + ". You MUST return exactly 5 items. For each event, include the url field with the best matching webpage from your search results (event page, ticket page, or venue page). Use empty string ONLY if no relevant page appeared in results. Respond ONLY with a raw JSON array, no markdown, no backticks: [{\"name\":\"...\",\"desc\":\"One sentence description\",\"area\":\"Neighborhood\",\"cat\":\"Category\",\"cost\":\"Price or Free\",\"emoji\":\"...\",\"url\":\"https://... or empty string\"}]",
           }],
         }),
       });
@@ -100,6 +100,7 @@ export default function DiscoverScreen() {
             cat: ev.cat || "Event",
             cost: ev.cost || "",
             emoji: ev.emoji || "🎉",
+            url: ev.url || "",
           })).filter((ev) => ev.name));
         } catch (e) {
           console.error("Discover JSON parse error:", e, match[0].slice(0, 300));
@@ -164,8 +165,13 @@ export default function DiscoverScreen() {
       )}
       <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
         {events.map((ev, i) => {
+          const hasUrl = ev.url && ev.url.startsWith("http");
           const openEvent = () => {
-            window.open("https://www.google.com/search?q=" + encodeURIComponent(ev.name + " NYC " + ev.area + " tickets"), "_blank", "noopener");
+            if (hasUrl) {
+              window.open(ev.url, "_blank", "noopener");
+            } else {
+              window.open("https://www.google.com/search?q=" + encodeURIComponent(ev.name + " NYC " + ev.area + " tickets"), "_blank", "noopener");
+            }
           };
           return (
             <div
@@ -173,7 +179,7 @@ export default function DiscoverScreen() {
               onClick={openEvent}
               role="link"
               tabIndex={0}
-              aria-label={`${ev.name} — ${ev.area}. Opens event page.`}
+              aria-label={`${ev.name} — ${ev.area}. ${hasUrl ? "Opens event website." : "Searches for event."}`}
               onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openEvent(); } }}
               style={{ background: P.card, border: "1px solid " + P.border, borderRadius: "16px", padding: "16px 18px", cursor: "pointer", transition: "all 0.2s", animation: `tabFadeIn 0.4s ease ${i * 0.06}s both` }}
             >
@@ -188,7 +194,7 @@ export default function DiscoverScreen() {
                     <span style={{ fontSize: "11px", fontFamily: sans, color: P.textDim }}>{ev.cat}</span>
                   </div>
                 </div>
-                <span style={{ fontSize: "12px", color: P.gold, fontFamily: sans, flexShrink: 0 }}>View ↗</span>
+                <span style={{ fontSize: "12px", color: P.gold, fontFamily: sans, flexShrink: 0 }}>{hasUrl ? "View ↗" : "Search ↗"}</span>
               </div>
             </div>
           );
