@@ -7,6 +7,49 @@ import Btn from './Btn.jsx';
 const TIMEFRAMES = ["tonight", "this week", "this weekend", "next week"];
 const DISCOVER_EMOJI = ["🗽", "🎭", "🎶", "🎨", "🌃", "🎪", "🎷", "🏙"];
 
+// Blocked spam/SEO/redirect domains that appear in web search results
+const BLOCKED_DOMAINS = [
+  "searchhounds.com", "addoor.co", "clicktracker.com", "trovit.com",
+  "startpage.com", "searchencrypt.com", "duckduckgo.com", "google.com",
+  "bing.com", "yahoo.com", "baidu.com", "yandex.com",
+];
+
+/** Validate and clean a URL from search results. Returns clean URL or empty string. */
+function cleanEventUrl(raw) {
+  if (!raw || typeof raw !== "string" || !raw.startsWith("http")) return "";
+  try {
+    const u = new URL(raw);
+    const host = u.hostname.toLowerCase();
+
+    // Block known spam / search engine domains
+    if (BLOCKED_DOMAINS.some((d) => host.includes(d))) {
+      // Try to recover a real domain from redirect params
+      const domainParam = u.searchParams.get("domain") || u.searchParams.get("url") ||
+        u.searchParams.get("redirect") || u.searchParams.get("goto") || u.searchParams.get("target");
+      if (domainParam) {
+        const recovered = domainParam.startsWith("http") ? domainParam : "https://" + domainParam;
+        try { new URL(recovered); return recovered; } catch { /* ignore */ }
+      }
+      return "";
+    }
+
+    // Block URLs with suspicious redirect/tracking params
+    const params = u.search.toLowerCase();
+    if (params.includes("oref=") || params.includes("psystem=")) {
+      const domainParam = u.searchParams.get("domain");
+      if (domainParam) {
+        const recovered = domainParam.startsWith("http") ? domainParam : "https://" + domainParam;
+        try { new URL(recovered); return recovered; } catch { /* ignore */ }
+      }
+      return "";
+    }
+
+    return raw;
+  } catch {
+    return "";
+  }
+}
+
 function SkeletonCard({ delay }) {
   return (
     <div className="skeleton-card" style={{ animationDelay: delay + "s" }}>
@@ -100,7 +143,7 @@ export default function DiscoverScreen() {
             cat: ev.cat || "Event",
             cost: ev.cost || "",
             emoji: ev.emoji || "🎉",
-            url: ev.url || "",
+            url: cleanEventUrl(ev.url),
           })).filter((ev) => ev.name));
         } catch (e) {
           console.error("Discover JSON parse error:", e, match[0].slice(0, 300));
