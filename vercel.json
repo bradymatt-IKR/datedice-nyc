@@ -1,7 +1,3 @@
 {
-  "functions": {
-    "api/search.js": {
-      "maxDuration": 60
-    }
-  }
+  "outputDirectory": "public"
 }
