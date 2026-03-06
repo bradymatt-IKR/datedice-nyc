@@ -66,11 +66,11 @@ export default function DiscoverScreen({ onPickEvent }) {
         signal: controller.signal,
         body: JSON.stringify({
           model: "claude-haiku-4-5-20251001",
-          max_tokens: 1000,
+          max_tokens: 1500,
           tools: [{ type: "web_search_20250305", name: "web_search" }],
           messages: [{
             role: "user",
-            content: "Today is " + formatDate(new Date()) + ". Search the web and list 4-5 specific NYC events, shows, exhibits, performances, or experiences happening " + query + " (" + getDateRangeLabel(query) + "). Focus on current/real events — museums with exhibits, theaters with running shows, markets, music venues, seasonal events for " + getSeason() + ". Respond ONLY with a raw JSON array, no markdown, no backticks: [{\"name\":\"...\",\"desc\":\"...\",\"area\":\"...\",\"cat\":\"...\",\"cost\":\"...\",\"emoji\":\"...\"}]",
+            content: "Today is " + formatDate(new Date()) + ". Search the web for NYC events and list exactly 5 specific events, shows, exhibits, performances, or experiences happening " + query + " (" + getDateRangeLabel(query) + "). Include a mix: theater/shows, museum exhibits, live music, and seasonal events for " + getSeason() + ". You MUST return exactly 5 items. Respond ONLY with a raw JSON array, no markdown, no backticks: [{\"name\":\"...\",\"desc\":\"One sentence description\",\"area\":\"Neighborhood\",\"cat\":\"Category\",\"cost\":\"Price or Free\",\"emoji\":\"...\"}]",
           }],
         }),
       });
