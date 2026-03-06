@@ -8,8 +8,7 @@
       "maxDuration": 60
     },
     "api/stream.js": {
-      "maxDuration": 60,
-      "supportsResponseStreaming": true
+      "maxDuration": 60
     }
   },
   "fluid": true
