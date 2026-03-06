@@ -114,7 +114,7 @@ const CUISINES=["Italian","Japanese","Mexican","Chinese","Thai","Korean","Indian
 const ACTIVITY_TYPES=["Outdoors & Nature","Museum & Art","Live Music & Concerts","Comedy","Theater & Performance","Immersive Experience","Sports & Games","Wellness & Spa","Shopping & Markets","Classes & Workshops","Tours & Walks","Day Trip","Nightlife & Dancing","Arcade & Gaming","Film & Cinema","Photography Walk","Boat & Water","Seasonal & Holiday"];
 
 // ── API PROXY ──
-const API_URL="https://datedice-nyc.vercel.app/api/search";
+const API_URL=window.DATEDICE_API_URL||"/api/search";
 
 // Strip any <cite ...>...</cite> tags the model may inject when using web_search
 function stripCites(str){
@@ -581,14 +581,25 @@ function DateDice(){
     else type=Math.random()>0.45?"food":"activity";
     setAltsLoading(true);
     try{
-      const alt=await fetchSuggestion(type,currentFilters,allUsed);
+      const [alt1,alt2]=await Promise.all([
+        fetchSuggestion(type,currentFilters,allUsed),
+        fetchSuggestion(type,currentFilters,allUsed)
+      ]);
       if(rollCount.current!==thisRoll){setAltsLoading(false);return;}
-      if(alt&&alt.name){
-        const newUsed=allUsed.concat([alt.name]);
-        usedNamesRef.current=newUsed;
-        setUsedNames(newUsed);
-        saveData("datedice:used",newUsed.slice(-200));
-        setAltResults(function(prev){return prev.concat([alt]);});
+      const newAlts=[];
+      const seen=new Set(allUsed.map(function(n){return n.toLowerCase();}));
+      [alt1,alt2].forEach(function(alt){
+        if(alt&&alt.name&&!seen.has(alt.name.toLowerCase())){
+          seen.add(alt.name.toLowerCase());
+          newAlts.push(alt);
+        }
+      });
+      if(newAlts.length>0){
+        const newNames=allUsed.concat(newAlts.map(function(a){return a.name;}));
+        usedNamesRef.current=newNames;
+        setUsedNames(newNames);
+        saveData("datedice:used",newNames.slice(-200));
+        setAltResults(function(prev){return prev.concat(newAlts);});
       }
     }catch(e){if(e&&e.name!=="AbortError")console.error("loadAlt:",e);}
     setAltsLoading(false);
