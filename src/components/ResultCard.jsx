@@ -38,6 +38,10 @@ export default function ResultCard({ result, onReroll, onLockIn, onShare, onTwea
       </div>
       <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "8px" }}>
         <Btn small onClick={onShare} style={{ flex: "1 1 auto", fontSize: "12px" }} aria-label="Share this suggestion">📤 Share</Btn>
+        <Btn small onClick={() => {
+          const dest = encodeURIComponent((result.address || result.name) + ", New York, NY");
+          window.open("https://www.google.com/maps/dir/?api=1&destination=" + dest + "&travelmode=walking", "_blank");
+        }} style={{ flex: "1 1 auto", fontSize: "12px" }} aria-label="Get walking directions">🚶 Directions</Btn>
         <Btn small onClick={() => window.open("https://www.google.com/search?q=" + encodeURIComponent(result.name + (result.address ? " " + result.address : " NYC")), "_blank")} style={{ flex: "1 1 auto", fontSize: "12px" }} aria-label="Look up on Google">🔎 Look Up</Btn>
         <Btn small onClick={() => {
           const now = new Date(), s = new Date(now), e = new Date(now);

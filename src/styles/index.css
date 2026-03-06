@@ -120,6 +120,39 @@ body {
 .s5 { animation: star-twinkle-bright 4.8s ease-in-out infinite; animation-delay: 1.8s; }
 .beacon { animation: glow-pulse 2s ease-in-out infinite; }
 
+/* ── Shooting Stars ── */
+@keyframes shooting-star {
+  0%   { transform: translateX(0) translateY(0) rotate(-35deg); opacity: 0; width: 0; }
+  3%   { opacity: 1; width: 80px; }
+  12%  { opacity: 0.8; }
+  18%  { opacity: 0; transform: translateX(280px) translateY(160px) rotate(-35deg); width: 80px; }
+  100% { opacity: 0; transform: translateX(280px) translateY(160px) rotate(-35deg); width: 0; }
+}
+.shooting-star {
+  position: absolute; height: 1px; pointer-events: none; border-radius: 1px;
+  background: linear-gradient(90deg, rgba(255,255,255,0.9), rgba(255,255,255,0.3), transparent);
+  box-shadow: 0 0 6px 1px rgba(232,195,106,0.4), 0 0 12px 2px rgba(232,195,106,0.15);
+  opacity: 0;
+}
+.ss1 { top: 8%;  left: 12%; animation: shooting-star 14s  3s  ease-out infinite; }
+.ss2 { top: 14%; left: 52%; animation: shooting-star 20s  9s  ease-out infinite; }
+.ss3 { top: 5%;  left: 32%; animation: shooting-star 26s  0s  ease-out infinite; }
+.ss4 { top: 18%; left: 72%; animation: shooting-star 34s  16s ease-out infinite; }
+
+/* ── Seasonal Skyline Tint ── */
+.skyline-horizon-glow.season-spring {
+  background: linear-gradient(to top, rgba(212,114,126,0.18) 0%, rgba(232,195,106,0.10) 25%, rgba(212,114,126,0.04) 50%, transparent 70%);
+}
+.skyline-horizon-glow.season-summer {
+  background: linear-gradient(to top, rgba(201,125,74,0.22) 0%, rgba(232,195,106,0.14) 25%, rgba(201,125,74,0.05) 50%, transparent 70%);
+}
+.skyline-horizon-glow.season-fall {
+  background: linear-gradient(to top, rgba(201,125,74,0.18) 0%, rgba(232,195,106,0.10) 25%, rgba(106,175,232,0.04) 50%, transparent 70%);
+}
+.skyline-horizon-glow.season-winter {
+  background: linear-gradient(to top, rgba(106,130,232,0.18) 0%, rgba(106,175,232,0.12) 25%, rgba(106,130,232,0.05) 50%, transparent 70%);
+}
+
 .skyline-stage {
   position: fixed; bottom: 0; left: 0; right: 0; top: 0;
   pointer-events: none; z-index: 1; overflow: hidden;
@@ -196,6 +229,13 @@ body {
   .star-field-svg { height: 60%; }
 }
 
+/* ── Keyboard hint (desktop only) ── */
+.keyboard-hint { display: none; }
+@media (hover: hover) and (pointer: fine) {
+  .keyboard-hint { display: block; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .w1,.w2,.w3,.w4,.w5,.w6,.w7,.w8,.s1,.s2,.s3,.s4,.s5,.beacon { animation: none !important; opacity: 0.6; }
+  .shooting-star { display: none !important; }
 }

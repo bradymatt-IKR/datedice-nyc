@@ -14,7 +14,11 @@ import WeatherBadge from './components/WeatherBadge.jsx';
 import MiniCalendar from './components/MiniCalendar.jsx';
 import ResultCard from './components/ResultCard.jsx';
 import DiscoverScreen from './components/DiscoverScreen.jsx';
+import HistoryStats from './components/HistoryStats.jsx';
 import Confetti from './components/Confetti.jsx';
+
+// ── Haptic feedback (no-op on desktop/unsupported) ──
+function haptic(pattern) { if (navigator.vibrate) navigator.vibrate(pattern); }
 
 // ── Time-of-day tint overlays ──
 function getTimeTint() {
@@ -111,6 +115,26 @@ export default function App() {
     return () => window.removeEventListener("devicemotion", onMotion);
   }, [screen, tab, subScreen]);
 
+  // ── Keyboard shortcuts (desktop) ──
+  useEffect(() => {
+    if (screen !== "app" || tab !== "roll") return;
+    function onKeyDown(e) {
+      if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA" || e.target.isContentEditable) return;
+      if (e.code === "Space" && subScreen === "filters" && !rolling) {
+        e.preventDefault();
+        setSubScreen("rolling");
+        doRoll();
+      }
+      if (e.key === "Escape" && subScreen === "rolling") {
+        e.preventDefault();
+        if (diceInterval.current) { clearInterval(diceInterval.current); diceInterval.current = null; }
+        setSubScreen("filters"); setResult(null); setRolling(false); setAltsLoading(false); setStreamText("");
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [screen, tab, subScreen, rolling]);
+
   // ── Rotating loading messages ──
   useEffect(() => {
     if (rolling) {
@@ -140,6 +164,7 @@ export default function App() {
 
     if (diceInterval.current) { clearInterval(diceInterval.current); diceInterval.current = null; }
     setRolling(true); setResult(null); setAltResults([]); setShowAlts(false); setLocked(false); setAltsLoading(false); setStreamText(""); setShowConfetti(false);
+    haptic([50, 30, 50]); // two quick taps at roll start
 
     diceInterval.current = setInterval(() => {
       setDiceVals([Math.ceil(Math.random() * 6), Math.ceil(Math.random() * 6)]);
@@ -181,6 +206,7 @@ export default function App() {
       setUsedNames(newUsed);
       saveData("datedice:used", newUsed.slice(-200));
       setResult(res);
+      haptic([80]); // firm tap on result
       setShowConfetti(true);
       setTimeout(() => setShowConfetti(false), 2500);
     } else {
@@ -415,6 +441,7 @@ export default function App() {
                 🎲 Roll the Dice {activeFilterCount > 0 ? "(" + activeFilterCount + " set)" : "— Totally Random"}
               </Btn>
               <p style={{ textAlign: "center", fontSize: "11px", color: P.textDim, fontFamily: sans, marginTop: "8px", opacity: 0.5 }}>📱 On mobile? Shake your phone to roll!</p>
+              <p className="keyboard-hint" style={{ textAlign: "center", fontSize: "11px", color: P.textDim, fontFamily: sans, marginTop: "4px", opacity: 0.4 }}>⌨ Space to roll · Esc to go back</p>
             </div>
           )}
 
@@ -491,6 +518,7 @@ export default function App() {
               <div style={{ background: P.card, border: "1px solid " + P.border, borderRadius: "16px", padding: "20px", marginBottom: "24px" }}>
                 <MiniCalendar history={history} />
               </div>
+              {history.length >= 3 && <HistoryStats history={history} />}
               {history.length > 0 && (
                 <div style={{ display: "flex", gap: "8px", marginBottom: "24px" }}>
                   {[

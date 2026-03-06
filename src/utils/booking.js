@@ -26,5 +26,14 @@ export function getBookingInfo(result) {
       isFallback: true,
     };
   }
+  if (result.cat === "Activity" || result.cat === "Activities" || result.cat === "activity") {
+    const q = encodeURIComponent(name + " NYC tickets");
+    return {
+      url: "https://www.google.com/search?q=" + q,
+      label: "Find Tickets",
+      platform: "google",
+      isFallback: true,
+    };
+  }
   return null;
 }
