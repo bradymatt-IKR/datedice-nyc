@@ -23,7 +23,7 @@ function SkeletonCard({ delay }) {
   );
 }
 
-export default function DiscoverScreen({ onPickEvent }) {
+export default function DiscoverScreen() {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
@@ -163,31 +163,36 @@ export default function DiscoverScreen({ onPickEvent }) {
         <div style={{ textAlign: "center", padding: "40px", color: P.textDim, fontFamily: sans }}>No events found — try another timeframe!</div>
       )}
       <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-        {events.map((ev, i) => (
-          <div
-            key={i}
-            onClick={() => onPickEvent(ev)}
-            role="button"
-            tabIndex={0}
-            aria-label={`${ev.name} — ${ev.area}. Click to pick this event.`}
-            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onPickEvent(ev); } }}
-            style={{ background: P.card, border: "1px solid " + P.border, borderRadius: "16px", padding: "16px 18px", cursor: "pointer", transition: "all 0.2s", animation: `tabFadeIn 0.4s ease ${i * 0.06}s both` }}
-          >
-            <div style={{ display: "flex", alignItems: "flex-start", gap: "12px" }}>
-              <span style={{ fontSize: "28px", flexShrink: 0 }} aria-hidden="true">{ev.emoji || "🎉"}</span>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontFamily: sans, fontSize: "15px", color: P.text, fontWeight: "600", marginBottom: "4px" }}>{ev.name}</div>
-                <div style={{ fontFamily: sans, fontSize: "13px", color: P.textDim, lineHeight: 1.5, marginBottom: "6px" }}>{ev.desc}</div>
-                <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                  <span style={{ fontSize: "11px", fontFamily: sans, color: P.accent }}>📍 {ev.area}</span>
-                  {ev.cost && <span style={{ fontSize: "11px", fontFamily: sans, color: P.textDim }}>💰 {ev.cost}</span>}
-                  <span style={{ fontSize: "11px", fontFamily: sans, color: P.textDim }}>{ev.cat}</span>
+        {events.map((ev, i) => {
+          const openEvent = () => {
+            window.open("https://www.google.com/search?q=" + encodeURIComponent(ev.name + " NYC " + ev.area + " tickets"), "_blank", "noopener");
+          };
+          return (
+            <div
+              key={i}
+              onClick={openEvent}
+              role="link"
+              tabIndex={0}
+              aria-label={`${ev.name} — ${ev.area}. Opens event page.`}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openEvent(); } }}
+              style={{ background: P.card, border: "1px solid " + P.border, borderRadius: "16px", padding: "16px 18px", cursor: "pointer", transition: "all 0.2s", animation: `tabFadeIn 0.4s ease ${i * 0.06}s both` }}
+            >
+              <div style={{ display: "flex", alignItems: "flex-start", gap: "12px" }}>
+                <span style={{ fontSize: "28px", flexShrink: 0 }} aria-hidden="true">{ev.emoji || "🎉"}</span>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontFamily: sans, fontSize: "15px", color: P.text, fontWeight: "600", marginBottom: "4px" }}>{ev.name}</div>
+                  <div style={{ fontFamily: sans, fontSize: "13px", color: P.textDim, lineHeight: 1.5, marginBottom: "6px" }}>{ev.desc}</div>
+                  <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                    <span style={{ fontSize: "11px", fontFamily: sans, color: P.accent }}>📍 {ev.area}</span>
+                    {ev.cost && <span style={{ fontSize: "11px", fontFamily: sans, color: P.textDim }}>💰 {ev.cost}</span>}
+                    <span style={{ fontSize: "11px", fontFamily: sans, color: P.textDim }}>{ev.cat}</span>
+                  </div>
                 </div>
+                <span style={{ fontSize: "12px", color: P.gold, fontFamily: sans, flexShrink: 0 }}>View ↗</span>
               </div>
-              <span style={{ fontSize: "12px", color: P.gold, fontFamily: sans, flexShrink: 0 }} aria-hidden="true">Pick →</span>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

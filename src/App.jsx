@@ -480,10 +480,7 @@ export default function App() {
 
           {/* ── Discover Tab ── */}
           {tab === "discover" && (
-            <DiscoverScreen onPickEvent={(ev) => {
-              setResult({ name: ev.name, desc: ev.desc, area: ev.area, cat: ev.cat || "Event", emoji: ev.emoji || "🎉" });
-              setAltResults([]); setShowAlts(false); setLocked(false); setTab("roll"); setSubScreen("rolling"); setRolling(false);
-            }} />
+            <DiscoverScreen />
           )}
 
           {/* ── Calendar Tab ── */}
