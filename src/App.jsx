@@ -267,12 +267,13 @@ export default function App() {
           <div style={{ fontSize: "72px", marginBottom: "16px", filter: "drop-shadow(0 0 24px rgba(232,195,106,0.3))" }} aria-hidden="true">🎲</div>
           <h1 style={{ fontSize: "clamp(38px, 8vw, 58px)", fontWeight: "400", letterSpacing: "0.04em", margin: "0 0 8px", background: P.grad, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>Date Dice</h1>
           <p style={{ fontSize: "14px", color: P.textDim, letterSpacing: "0.18em", textTransform: "uppercase", margin: "0 0 8px", fontFamily: sans }}>New York City Edition</p>
-          <p style={{ fontSize: "13px", color: P.accent, margin: "0 0 32px", fontFamily: sans }}>📅 {formatDate(new Date())} · {getSeason()}</p>
+          <p style={{ fontSize: "13px", color: P.accent, margin: "0 0 8px", fontFamily: sans }}>📅 {formatDate(new Date())} · {getSeason()}</p>
+          {weather && <p style={{ fontSize: "13px", color: P.textDim, margin: "0 0 6px", fontFamily: sans }}>{weather.wmoIcon} {weather.tempF}°F · {weather.classification} in Brooklyn</p>}
+          {history.length > 0 && <p style={{ fontSize: "13px", color: P.textDim, margin: "0 0 6px", fontFamily: sans }}>{history.filter((h) => h.status === "completed").length} dates completed · {history.filter((h) => h.status === "locked").length} upcoming</p>}
+          <div style={{ height: "24px" }} />
           <p style={{ fontSize: "17px", lineHeight: 1.7, maxWidth: "400px", color: "rgba(240,236,226,0.6)", margin: "0 0 12px" }}>Set your mood. Roll the dice.<br />Let the city surprise you.</p>
           <p style={{ fontSize: "13px", color: P.textDim, margin: "0 0 40px", fontFamily: sans, maxWidth: "360px" }}>Every roll searches live for real restaurants, activities & experiences across 50+ NYC neighborhoods</p>
           <Btn primary onClick={() => setScreen("app")} style={{ padding: "16px 56px", fontSize: "16px", boxShadow: "0 4px 28px rgba(232,195,106,0.3)" }}>Let's Go</Btn>
-          {weather && <p style={{ marginTop: "24px", fontSize: "13px", color: P.textDim, fontFamily: sans }}>{weather.wmoIcon} {weather.tempF}°F · {weather.classification} in Brooklyn</p>}
-          {history.length > 0 && <p style={{ marginTop: "8px", fontSize: "13px", color: P.textDim, fontFamily: sans }}>{history.filter((h) => h.status === "completed").length} dates completed · {history.filter((h) => h.status === "locked").length} upcoming</p>}
         </div>
       </div>
     );
@@ -330,7 +331,7 @@ export default function App() {
               <WeatherBadge weather={weather} loading={weatherLoading} />
               {Object.entries(FILTERS_MAIN).map(([key, cfg]) => (
                 <div key={key} style={{ marginBottom: "22px" }} role="group" aria-labelledby={"filter-" + key}>
-                  <div id={"filter-" + key} style={{ fontSize: "12px", color: P.textDim, textTransform: "uppercase", letterSpacing: "0.15em", marginBottom: "8px", fontFamily: sans }}>
+                  <div id={"filter-" + key} style={{ fontSize: "12px", color: "rgba(240,236,226,0.7)", textTransform: "uppercase", letterSpacing: "0.15em", marginBottom: "8px", fontFamily: sans }}>
                     <span aria-hidden="true">{cfg.icon}</span> {cfg.label}
                     {key === "budget" && <span style={{ color: P.accent, marginLeft: "6px", textTransform: "none", letterSpacing: "0", fontSize: "11px" }}>($150–300 = upscale · Splurge = $300+)</span>}
                   </div>
@@ -345,7 +346,7 @@ export default function App() {
               {/* Neighborhood with borough-colored dots */}
               <div style={{ marginBottom: "22px" }}>
                 <button onClick={() => setShowNeighborhoods(!showNeighborhoods)} aria-expanded={showNeighborhoods} aria-controls="neighborhood-list" style={{ background: "none", border: "none", padding: 0, cursor: "pointer", display: "flex", alignItems: "center", gap: "6px", marginBottom: "8px", width: "100%" }}>
-                  <span style={{ fontSize: "12px", color: P.textDim, textTransform: "uppercase", letterSpacing: "0.15em", fontFamily: sans }}>📍 Neighborhood</span>
+                  <span style={{ fontSize: "12px", color: "rgba(240,236,226,0.7)", textTransform: "uppercase", letterSpacing: "0.15em", fontFamily: sans }}>📍 Neighborhood</span>
                   {filters.neighborhood?.length > 0 && <span style={{ fontSize: "12px", color: P.gold, fontFamily: sans }}>· {filters.neighborhood.length === 1 ? filters.neighborhood[0] : filters.neighborhood.length + " selected"}</span>}
                   <span style={{ fontSize: "10px", color: P.textDim, marginLeft: "auto" }} aria-hidden="true">{showNeighborhoods ? "▴" : "▾"}</span>
                 </button>
@@ -371,7 +372,7 @@ export default function App() {
               {(filters.category === "Food & Drink" || !filters.category || filters.category === "Surprise Me") && (
                 <div style={{ marginBottom: "22px" }}>
                   <button onClick={() => setShowCuisines(!showCuisines)} aria-expanded={showCuisines} aria-controls="cuisine-list" style={{ background: "none", border: "none", padding: 0, cursor: "pointer", display: "flex", alignItems: "center", gap: "6px", marginBottom: "8px", width: "100%" }}>
-                    <span style={{ fontSize: "12px", color: P.textDim, textTransform: "uppercase", letterSpacing: "0.15em", fontFamily: sans }}>🍽 Cuisine</span>
+                    <span style={{ fontSize: "12px", color: "rgba(240,236,226,0.7)", textTransform: "uppercase", letterSpacing: "0.15em", fontFamily: sans }}>🍽 Cuisine</span>
                     {filters.cuisine && <span style={{ fontSize: "12px", color: P.gold, fontFamily: sans }}>· {filters.cuisine}</span>}
                     <span style={{ fontSize: "10px", color: P.textDim, marginLeft: "auto" }} aria-hidden="true">{showCuisines ? "▴" : "▾"}</span>
                   </button>
@@ -390,7 +391,7 @@ export default function App() {
               {(filters.category === "Activities" || !filters.category || filters.category === "Surprise Me") && (
                 <div style={{ marginBottom: "22px" }}>
                   <button onClick={() => setShowActivityTypes(!showActivityTypes)} aria-expanded={showActivityTypes} aria-controls="activity-type-list" style={{ background: "none", border: "none", padding: 0, cursor: "pointer", display: "flex", alignItems: "center", gap: "6px", marginBottom: "8px", width: "100%" }}>
-                    <span style={{ fontSize: "12px", color: P.textDim, textTransform: "uppercase", letterSpacing: "0.15em", fontFamily: sans }}>🎯 Activity Type</span>
+                    <span style={{ fontSize: "12px", color: "rgba(240,236,226,0.7)", textTransform: "uppercase", letterSpacing: "0.15em", fontFamily: sans }}>🎯 Activity Type</span>
                     {filters.activityType && <span style={{ fontSize: "12px", color: P.gold, fontFamily: sans }}>· {filters.activityType}</span>}
                     <span style={{ fontSize: "10px", color: P.textDim, marginLeft: "auto" }} aria-hidden="true">{showActivityTypes ? "▴" : "▾"}</span>
                   </button>
