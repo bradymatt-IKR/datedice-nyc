@@ -1,7 +1,40 @@
+// Blocked spam/SEO/redirect domains (shared pattern with DiscoverScreen)
+const BLOCKED_DOMAINS = [
+  "searchhounds.com", "addoor.co", "clicktracker.com", "trovit.com",
+  "startpage.com", "searchencrypt.com", "duckduckgo.com", "google.com",
+  "bing.com", "yahoo.com", "baidu.com", "yandex.com",
+];
+
+/** Validate a booking URL. Returns clean URL or empty string. */
+function validateBookingUrl(raw) {
+  if (!raw || typeof raw !== "string" || !raw.startsWith("http")) return "";
+  try {
+    const u = new URL(raw);
+    const host = u.hostname.toLowerCase();
+
+    // Block known spam / search engine domains
+    if (BLOCKED_DOMAINS.some((d) => host.includes(d))) return "";
+
+    // Block suspicious redirect/tracking params
+    const params = u.search.toLowerCase();
+    if (params.includes("oref=") || params.includes("psystem=")) return "";
+
+    // Block obviously invalid TLDs or localhost
+    if (host === "localhost" || host.endsWith(".local") || host.endsWith(".test")) return "";
+
+    // Block IPs
+    if (/^\d+\.\d+\.\d+\.\d+$/.test(host)) return "";
+
+    return raw;
+  } catch {
+    return "";
+  }
+}
+
 export function getBookingInfo(result) {
   const name = result.name || "";
   const platform = (result.bookingPlatform || "").toLowerCase();
-  const modelUrl = result.bookingUrl || "";
+  const modelUrl = validateBookingUrl(result.bookingUrl || "");
   const isRealUrl = modelUrl.startsWith("http") && modelUrl.length > 12;
 
   if (isRealUrl) {

@@ -29,6 +29,15 @@ export default function ResultCard({ result, onReroll, onLockIn, onShare, onTwea
             {booking.label}
             {booking.isFallback && <span style={{ fontSize: "11px", opacity: 0.6, fontWeight: "400" }}>(search)</span>}
           </button>
+          {!booking.isFallback && (
+            <button onClick={() => window.open("https://www.google.com/search?q=" + encodeURIComponent(result.name + " " + (result.address || "NYC") + " book reserve tickets"), "_blank")} style={{
+              width: "100%", background: "none", border: "none", padding: "6px 0 0",
+              color: P.textDim, fontSize: "11px", fontFamily: sans, cursor: "pointer", opacity: 0.5,
+              transition: "opacity 0.2s",
+            }} onMouseEnter={e => e.currentTarget.style.opacity = "0.8"} onMouseLeave={e => e.currentTarget.style.opacity = "0.5"}>
+              Link not working? Search instead ↗
+            </button>
+          )}
         </div>
       )}
 
