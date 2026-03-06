@@ -1,0 +1,163 @@
+import { useState, useEffect, useRef } from 'react';
+import { P, sans, serif, LOADING_MESSAGES } from '../data/constants.js';
+import { API_URL, stripCites } from '../utils/api.js';
+import { formatDate, getDateRangeLabel, getSeason } from '../utils/date.js';
+import Btn from './Btn.jsx';
+
+const TIMEFRAMES = ["tonight", "this week", "this weekend", "next week"];
+const DISCOVER_EMOJI = ["🗽", "🎭", "🎶", "🎨", "🌃", "🎪", "🎷", "🏙"];
+
+function SkeletonCard({ delay }) {
+  return (
+    <div className="skeleton-card" style={{ animationDelay: delay + "s" }}>
+      <div style={{ display: "flex", alignItems: "flex-start", gap: "12px" }}>
+        <div className="skeleton-line" style={{ width: 28, height: 28, borderRadius: "8px", flexShrink: 0 }} />
+        <div style={{ flex: 1 }}>
+          <div className="skeleton-line" style={{ width: "70%", marginBottom: "8px" }} />
+          <div className="skeleton-line" style={{ width: "100%", marginBottom: "6px" }} />
+          <div className="skeleton-line" style={{ width: "45%", marginBottom: "6px" }} />
+          <div className="skeleton-line" style={{ width: "30%" }} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function DiscoverScreen({ onPickEvent }) {
+  const [events, setEvents] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [searched, setSearched] = useState(false);
+  const [query, setQuery] = useState("tonight");
+  const [loadingMsg, setLoadingMsg] = useState(LOADING_MESSAGES[0]);
+  const [loadingEmoji, setLoadingEmoji] = useState(DISCOVER_EMOJI[0]);
+  const msgInterval = useRef(null);
+
+  useEffect(() => {
+    if (loading) {
+      let idx = 0;
+      setLoadingMsg(LOADING_MESSAGES[0]);
+      setLoadingEmoji(DISCOVER_EMOJI[0]);
+      msgInterval.current = setInterval(() => {
+        idx = (idx + 1) % LOADING_MESSAGES.length;
+        setLoadingMsg(LOADING_MESSAGES[idx]);
+        setLoadingEmoji(DISCOVER_EMOJI[idx % DISCOVER_EMOJI.length]);
+      }, 2500);
+    } else {
+      if (msgInterval.current) clearInterval(msgInterval.current);
+    }
+    return () => { if (msgInterval.current) clearInterval(msgInterval.current); };
+  }, [loading]);
+
+  const searchEvents = async () => {
+    setLoading(true);
+    setSearched(true);
+    try {
+      const resp = await fetch(API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-6",
+          max_tokens: 1000,
+          tools: [{ type: "web_search_20250305", name: "web_search" }],
+          messages: [{
+            role: "user",
+            content: "Today is " + formatDate(new Date()) + ". List 6-8 specific NYC events, shows, exhibits, performances, or experiences likely happening " + query + " (" + getDateRangeLabel(query) + "). Draw on your knowledge of NYC's cultural calendar — museums with current exhibits, theaters with running shows, markets, music venues, seasonal events for " + getSeason() + ". Respond ONLY with a raw JSON array, no markdown, no backticks: [{\"name\":\"...\",\"desc\":\"...\",\"area\":\"...\",\"cat\":\"...\",\"cost\":\"...\",\"emoji\":\"...\"}]",
+          }],
+        }),
+      });
+      if (!resp.ok) { console.error("Discover API error", resp.status); setEvents([]); setLoading(false); return; }
+      const data = await resp.json();
+      if (data.error) { setEvents([]); setLoading(false); return; }
+      const rawText = (data.content || []).map((b) => (b.type === "text" ? b.text : "")).join("");
+      const cleaned = stripCites(rawText).replace(/```json|```/g, "").trim();
+      const match = cleaned.match(/\[[\s\S]*\]/);
+      if (match) {
+        try {
+          const parsed = JSON.parse(match[0]);
+          setEvents(parsed.slice(0, 8).map((ev) => ({
+            name: stripCites(ev.name || ""),
+            desc: stripCites(ev.desc || ""),
+            area: stripCites(ev.area || ""),
+            cat: ev.cat || "Event",
+            cost: ev.cost || "",
+            emoji: ev.emoji || "🎉",
+          })).filter((ev) => ev.name));
+        } catch (e) {
+          console.error("Discover JSON parse error:", e, match[0].slice(0, 300));
+          setEvents([]);
+        }
+      } else {
+        console.warn("Discover: no JSON array in response. Raw:", rawText.slice(0, 300));
+        setEvents([]);
+      }
+    } catch (err) {
+      console.error("Discover fetch error:", err);
+      setEvents([]);
+    }
+    setLoading(false);
+  };
+
+  return (
+    <div>
+      <h2 style={{ fontSize: "24px", fontWeight: "400", margin: "0 0 4px", color: P.gold, fontFamily: serif }}>Discover NYC</h2>
+      <p style={{ fontSize: "13px", color: P.textDim, margin: "0 0 6px", fontFamily: sans }}>Live events, shows & pop-ups</p>
+      <p style={{ fontSize: "12px", color: P.accent, margin: "0 0 20px", fontFamily: sans }}>📅 {formatDate(new Date())}</p>
+      <div role="listbox" aria-label="Timeframe" style={{ display: "flex", gap: "8px", marginBottom: "20px", flexWrap: "wrap" }}>
+        {TIMEFRAMES.map((q) => (
+          <button
+            key={q}
+            role="option"
+            aria-selected={query === q}
+            onClick={() => setQuery(q)}
+            style={{ background: query === q ? P.goldDim : P.card, border: "1px solid " + (query === q ? "rgba(232,195,106,0.3)" : P.border), borderRadius: "20px", padding: "8px 14px", fontSize: "12px", fontFamily: sans, color: query === q ? P.gold : P.textDim, cursor: "pointer", textTransform: "capitalize" }}
+          >
+            {q}
+          </button>
+        ))}
+      </div>
+      {query && <p style={{ fontSize: "11px", color: P.textDim, margin: "-12px 0 16px", fontFamily: sans }}>{getDateRangeLabel(query)}</p>}
+      <Btn primary onClick={searchEvents} disabled={loading} style={{ width: "100%", marginBottom: "20px" }}>{loading ? "Searching NYC..." : "🔍 Find Events"}</Btn>
+      {loading && (
+        <div>
+          <div style={{ textAlign: "center", padding: "20px 0 24px" }} role="status" aria-label="Searching">
+            <div style={{ fontSize: "32px", animation: "pulse 1s infinite", marginBottom: "10px", transition: "all 0.3s" }} aria-hidden="true">{loadingEmoji}</div>
+            <p style={{ color: P.textDim, fontFamily: sans, fontSize: "14px", transition: "opacity 0.3s" }}>{loadingMsg}</p>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+            {[0, 0.1, 0.2, 0.3, 0.4, 0.5].map((d, i) => <SkeletonCard key={i} delay={d} />)}
+          </div>
+        </div>
+      )}
+      {!loading && searched && events.length === 0 && (
+        <div style={{ textAlign: "center", padding: "40px", color: P.textDim, fontFamily: sans }}>No events found — try another timeframe!</div>
+      )}
+      <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+        {events.map((ev, i) => (
+          <div
+            key={i}
+            onClick={() => onPickEvent(ev)}
+            role="button"
+            tabIndex={0}
+            aria-label={`${ev.name} — ${ev.area}. Click to pick this event.`}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onPickEvent(ev); } }}
+            style={{ background: P.card, border: "1px solid " + P.border, borderRadius: "16px", padding: "16px 18px", cursor: "pointer", transition: "all 0.2s", animation: `tabFadeIn 0.4s ease ${i * 0.06}s both` }}
+          >
+            <div style={{ display: "flex", alignItems: "flex-start", gap: "12px" }}>
+              <span style={{ fontSize: "28px", flexShrink: 0 }} aria-hidden="true">{ev.emoji || "🎉"}</span>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontFamily: sans, fontSize: "15px", color: P.text, fontWeight: "600", marginBottom: "4px" }}>{ev.name}</div>
+                <div style={{ fontFamily: sans, fontSize: "13px", color: P.textDim, lineHeight: 1.5, marginBottom: "6px" }}>{ev.desc}</div>
+                <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                  <span style={{ fontSize: "11px", fontFamily: sans, color: P.accent }}>📍 {ev.area}</span>
+                  {ev.cost && <span style={{ fontSize: "11px", fontFamily: sans, color: P.textDim }}>💰 {ev.cost}</span>}
+                  <span style={{ fontSize: "11px", fontFamily: sans, color: P.textDim }}>{ev.cat}</span>
+                </div>
+              </div>
+              <span style={{ fontSize: "12px", color: P.gold, fontFamily: sans, flexShrink: 0 }} aria-hidden="true">Pick →</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}

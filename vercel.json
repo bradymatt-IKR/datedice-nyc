@@ -1,8 +1,13 @@
 {
-  "outputDirectory": "public",
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
   "functions": {
     "api/search.js": {
       "maxDuration": 60
+    },
+    "api/stream.js": {
+      "maxDuration": 60,
+      "supportsResponseStreaming": true
     }
   },
   "fluid": true
