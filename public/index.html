@@ -1,4 +1,4 @@
-prompt="You are a NYC experiences expert with deep knowledge of museums, shows, parks, immersive experiences, classes, events, and hidden gems across every neighborhood. Suggest ONE specific real, currently-available experience matching these criteria:\n- Type: "+actTypeStr+"\n- Neighborhood: "+neighborhoodStr+"\n- Time: "+(timeOfDay||"any")+"\n- Weather: "+(weather||"any")+" (indoor for rain/cold, outdoor for sunny)\n- Vibe: "+(vibe||"any")+"\n- Budget: "+(budget||"any")+" (Free, Under $50, $50-150, $150-300, Splurge=$300+)\n- Duration: "+(duration||"any")+"\n- Season: "+season+" (recommend seasonally-appropriate experiences)\n- Today: "+today+"\n"+(avoidList?"- DO NOT suggest: "+avoidList:"")+jsonWarning+"\n{\"name\":\"...\",\"desc\":\"One vivid sentence describing what makes this experience special and why it's perfect for a date\",\"area\":\"Neighborhood or location\",\"address\":\"Address or general area\",\"cat\":\"Activity\",\"emoji\":\"fitting emoji\",\"tip\":\"One specific insider tip (best day to go, what to skip, hidden details, etc)\",\"bookingUrl\":\"ticket/booking URL if applicable, else empty string\",\"bookingPlatform\":\"Eventbrite|Website|Ticketmaster|NoReservation|empty string\"}";    prompt="You are a NYC food expert with encyclopedic knowledge of restaurants, bars, cafés, and food experiences in every neighborhood. Suggest ONE specific real, currently-operating place matching these criteria:\n- Neighborhood: "+neighborhoodStr+"\n- Cuisine: "+cuisineStr+"\n- Time: "+(timeOfDay||"any")+"\n- Weather: "+(weather||"any")+" (indoor/cozy for cold/rain, outdoor/rooftop for warm/sunny)\n- Vibe: "+(vibe||"any")+"\n- Budget: "+(budget||"any")+" (Free=free tastings, Under $50=casual, $50-150=mid-range, $150-300=upscale, Splurge=$300+/person)\n- Duration: "+(duration||"any")+"\n- Season: "+season+"\n- Today: "+today+"\n"+(avoidList?"- DO NOT suggest: "+avoidList:"")+jsonWarning+"\n{\"name\":\"...\",\"desc\":\"One vivid sentence describing what makes this place special and what to order\",\"area\":\"Neighborhood\",\"address\":\"Full street address\",\"cat\":\"Food & Drink\",\"priceRange\":\"$/$$/$$$/$$$$\",\"cuisine\":\"Cuisine type\",\"emoji\":\"fitting food/drink emoji\",\"tip\":\"One specific insider tip (dish to order, best seat, best time, secret menu item, etc)\",\"bookingUrl\":\"reservation URL if known, else empty string\",\"bookingPlatform\":\"Resy|OpenTable|Tock|Website|WalkIn|empty string\"}";<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -114,7 +114,7 @@ const CUISINES=["Italian","Japanese","Mexican","Chinese","Thai","Korean","Indian
 const ACTIVITY_TYPES=["Outdoors & Nature","Museum & Art","Live Music & Concerts","Comedy","Theater & Performance","Immersive Experience","Sports & Games","Wellness & Spa","Shopping & Markets","Classes & Workshops","Tours & Walks","Day Trip","Nightlife & Dancing","Arcade & Gaming","Film & Cinema","Photography Walk","Boat & Water","Seasonal & Holiday"];
 
 // ── API PROXY ──
-const API_URL="/api/search";
+const API_URL=window.DATEDICE_API_URL||"/api/search";
 
 // Strip any <cite ...>...</cite> tags the model may inject when using web_search
 function stripCites(str){
@@ -164,68 +164,31 @@ function getBookingInfo(result){
 }
 
 // ── Read an Anthropic SSE stream and return all text content concatenated ──
-async function readStream(resp) {
-  const reader = resp.body.getReader();
-  const decoder = new TextDecoder();
-  let raw = "";
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    raw += decoder.decode(value, { stream: true });
-  }
-  // Parse SSE lines: each "data: {...}" line may contain a text delta
-  let text = "";
-  for (const line of raw.split("\n")) {
-    if (!line.startsWith("data: ")) continue;
-    const payload = line.slice(6).trim();
-    if (payload === "[DONE]") continue;
-    try {
-      const ev = JSON.parse(payload);
-      // content_block_delta carries text chunks
-      if (ev.type === "content_block_delta" && ev.delta && ev.delta.type === "text_delta") {
-        text += ev.delta.text;
-      }
-      // input_json_delta carries tool-input chunks (web_search query etc) — skip
-    } catch (e) { /* ignore malformed lines */ }
-  }
-  return text;
-}
-
 async function fetchSuggestion(type,filters,usedNames){
   const{timeOfDay,weather,vibe,budget,duration,neighborhood,cuisine,activityType}=filters;
   const season=getSeason(),today=formatDate(new Date());
   const avoidList=(usedNames||[]).slice(-40).join(", ");
   const neighborhoodStr=neighborhood||"anywhere in NYC or nearby";
-  const jsonWarning="\n\nCRITICAL: Respond with ONLY a raw JSON object. No markdown, no backticks, no <cite> tags, no citation markup. All field values must be plain text strings only.";
+  const jsonNote="\n\nRespond with ONLY a raw JSON object — no markdown, no backticks, no extra text.";
   let prompt;
   if(type==="food"){
     const cuisineStr=cuisine||"any cuisine — surprise us";
-    prompt="You are a NYC food expert with encyclopedic, up-to-date knowledge of restaurants, bars, cafés, and food experiences. Search the web to find a great current recommendation matching these criteria:\n- Neighborhood: "+neighborhoodStr+"\n- Cuisine: "+cuisineStr+"\n- Time: "+(timeOfDay||"any")+"\n- Weather: "+(weather||"any")+" (indoor/cozy for cold/rain, outdoor/rooftop for warm/sunny)\n- Vibe: "+(vibe||"any")+"\n- Budget: "+(budget||"any")+" (Free=free tastings, Under $50=casual, $50-150=mid-range, $150-300=upscale, Splurge=$300+/person)\n- Duration: "+(duration||"any")+"\n- Season: "+season+"\n- Today: "+today+"\n"+(avoidList?"- DO NOT suggest: "+avoidList:"")+jsonWarning+"\n{\"name\":\"...\",\"desc\":\"One vivid sentence about what makes this place special and what to order\",\"area\":\"Neighborhood\",\"address\":\"Full street address\",\"cat\":\"Food & Drink\",\"priceRange\":\"$/$$/$$$/$$$$\",\"cuisine\":\"Cuisine type\",\"emoji\":\"fitting food/drink emoji\",\"tip\":\"One specific insider tip (dish, best seat, best time, secret item)\",\"bookingUrl\":\"reservation URL if known, else empty string\",\"bookingPlatform\":\"Resy|OpenTable|Tock|Website|WalkIn|empty string\"}";
+    prompt="You are a NYC food expert with deep knowledge of every neighborhood's restaurant scene. Suggest ONE specific real, currently-operating restaurant, bar, café, or food experience matching:\n- Neighborhood: "+neighborhoodStr+"\n- Cuisine: "+cuisineStr+"\n- Time: "+(timeOfDay||"any")+"\n- Weather: "+(weather||"any")+" (cozy/indoor for cold/rain; outdoor/rooftop for warm/sunny)\n- Vibe: "+(vibe||"any")+"\n- Budget: "+(budget||"any")+" (Free=free events, Under $50=casual, $50-150=mid-range, $150-300=upscale, Splurge=$300+/person)\n- Duration: "+(duration||"any")+"\n- Season: "+season+" · Today: "+today+"\n"+(avoidList?"Do NOT suggest: "+avoidList+"\n":"")+jsonNote+"\n{\"name\":\"...\",\"desc\":\"One vivid sentence — what makes it special and what to order\",\"area\":\"Neighborhood\",\"address\":\"Full street address\",\"cat\":\"Food & Drink\",\"priceRange\":\"$/$$/$$$/$$$$\",\"cuisine\":\"type\",\"emoji\":\"🍽\",\"tip\":\"One insider tip\",\"bookingUrl\":\"\",\"bookingPlatform\":\"Resy|OpenTable|Tock|Website|WalkIn\"}";
   }else{
-    const actTypeStr=activityType||"any type of activity or experience";
-    prompt="You are a NYC experiences expert. Search the web to find a great current recommendation matching these criteria:\n- Type: "+actTypeStr+"\n- Neighborhood: "+neighborhoodStr+"\n- Time: "+(timeOfDay||"any")+"\n- Weather: "+(weather||"any")+" (indoor for rain/cold, outdoor for sunny)\n- Vibe: "+(vibe||"any")+"\n- Budget: "+(budget||"any")+" (Free, Under $50, $50-150, $150-300, Splurge=$300+)\n- Duration: "+(duration||"any")+"\n- Season: "+season+" (recommend seasonally-appropriate experiences)\n- Today: "+today+"\n"+(avoidList?"- DO NOT suggest: "+avoidList:"")+jsonWarning+"\n{\"name\":\"...\",\"desc\":\"One vivid sentence about what makes this experience special and why it's perfect for a date\",\"area\":\"Neighborhood or location\",\"address\":\"Address or general area\",\"cat\":\"Activity\",\"emoji\":\"fitting emoji\",\"tip\":\"One specific insider tip (best day, what to skip, hidden details)\",\"bookingUrl\":\"ticket/booking URL if applicable, else empty string\",\"bookingPlatform\":\"Eventbrite|Website|Ticketmaster|NoReservation|empty string\"}";
+    const actTypeStr=activityType||"any activity or experience";
+    prompt="You are a NYC experiences expert with deep knowledge of museums, shows, parks, events, classes, and hidden gems. Suggest ONE specific real, currently-available experience matching:\n- Type: "+actTypeStr+"\n- Neighborhood: "+neighborhoodStr+"\n- Time: "+(timeOfDay||"any")+"\n- Weather: "+(weather||"any")+" (indoor for rain/cold; outdoor for sunny)\n- Vibe: "+(vibe||"any")+"\n- Budget: "+(budget||"any")+" (Free, Under $50, $50-150, $150-300, Splurge=$300+)\n- Duration: "+(duration||"any")+"\n- Season: "+season+" · Today: "+today+"\n"+(avoidList?"Do NOT suggest: "+avoidList+"\n":"")+jsonNote+"\n{\"name\":\"...\",\"desc\":\"One vivid sentence — what makes it special and why it's great for a date\",\"area\":\"Neighborhood or location\",\"address\":\"Address or general area\",\"cat\":\"Activity\",\"emoji\":\"✨\",\"tip\":\"One insider tip\",\"bookingUrl\":\"\",\"bookingPlatform\":\"Eventbrite|Website|Ticketmaster|NoReservation\"}";
   }
   try{
     const resp=await fetch(API_URL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-6",max_tokens:1000,tools:[{type:"web_search_20250305",name:"web_search"}],messages:[{role:"user",content:prompt}]})});
-    if(!resp.ok){
-      const errBody=await resp.text().catch(function(){return"(unreadable)";});
-      console.error("API error "+resp.status+":",errBody);
-      return null;
-    }
-    const rawText=await readStream(resp);
-    const text=stripCites(rawText).replace(/```json|```/g,"").trim();
-    const match=text.match(/\{[\s\S]*\}/);
-    if(match){
-      try{return cleanResult(JSON.parse(match[0]));}
-      catch(e){
-        try{return cleanResult(JSON.parse(match[0].replace(/<[^>]+>/g,"")));}
-        catch(e2){console.error("JSON parse failed:",match[0].slice(0,200));return null;}
-      }
-    }
-    console.warn("No JSON in response:",rawText.slice(0,300));
-  }catch(err){
-    console.error("fetchSuggestion error:",err);
-  }
+    if(!resp.ok){console.error("API",resp.status,await resp.text().catch(()=>""));return null;}
+    const data=await resp.json();
+    if(data.error){console.error("API error:",data.error);return null;}
+    const raw=(data.content||[]).map(function(b){return b.type==="text"?b.text:"";}).join("");
+    const clean=stripCites(raw).replace(/```json|```/g,"").trim();
+    const m=clean.match(/\{[\s\S]*\}/);
+    if(m){try{return cleanResult(JSON.parse(m[0]));}catch(e){return null;}}
+    console.warn("No JSON in response:",raw.slice(0,200));
+  }catch(err){console.error("fetchSuggestion:",err);}
   return null;
 }
 
@@ -472,9 +435,11 @@ const DiscoverScreen=({onPickEvent})=>{
   const[events,setEvents]=useState([]);const[loading,setLoading]=useState(false);const[searched,setSearched]=useState(false);const[query,setQuery]=useState("tonight");
   const searchEvents=async function(){setLoading(true);setSearched(true);
     try{
-      const resp=await fetch(API_URL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-6",max_tokens:1000,tools:[{type:"web_search_20250305",name:"web_search"}],messages:[{role:"user",content:"Today is "+formatDate(new Date())+". Search the web and find 6-8 specific real events, shows, exhibitions, performances, pop-ups, or experiences happening in New York City "+query+" ("+getDateRangeLabel(query)+"). Find things actually scheduled for these dates. CRITICAL: Respond ONLY with a raw JSON array, no markdown, no backticks, no cite tags: [{\"name\":\"...\",\"desc\":\"...\",\"area\":\"...\",\"cat\":\"...\",\"cost\":\"...\",\"emoji\":\"...\"}]"}]})});
+      const resp=await fetch(API_URL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-6",max_tokens:1000,tools:[{type:"web_search_20250305",name:"web_search"}],messages:[{role:"user",content:"Today is "+formatDate(new Date())+". List 6-8 specific NYC events, shows, exhibits, performances, or experiences likely happening "+query+" ("+getDateRangeLabel(query)+"). Draw on your knowledge of NYC's cultural calendar — museums with current exhibits, theaters with running shows, markets, music venues, seasonal events for "+getSeason()+". Respond ONLY with a raw JSON array, no markdown, no backticks: [{\"name\":\"...\",\"desc\":\"...\",\"area\":\"...\",\"cat\":\"...\",\"cost\":\"...\",\"emoji\":\"...\"}]"}]})});
       if(!resp.ok){console.error("Discover API error",resp.status);setEvents([]);setLoading(false);return;}
-      const rawText=await readStream(resp);
+      const data2=await resp.json();
+      if(data2.error){setEvents([]);setLoading(false);return;}
+      const rawText=(data2.content||[]).map(function(b){return b.type==="text"?b.text:"";}).join("");
       const cleaned=stripCites(rawText).replace(/```json|```/g,"").trim();
       const match=cleaned.match(/\[[\s\S]*\]/);
       if(match){
@@ -554,12 +519,12 @@ function DateDice(){
   const showToast=function(msg){setToast(msg);setTimeout(function(){setToast(null);},2500);};
 
   const doRoll=useCallback(async function(){
+    // Each roll gets a unique ID; stale async work checks this and bails
+    rollCount.current+=1;
+    const myRoll=rollCount.current;
+
     const currentFilters=filtersRef.current;
     const currentUsed=[...usedNamesRef.current];
-
-    // Bump generation counter — any async work from a prior call sees a different ID and bails
-    rollCount.current+=1;
-    const thisRoll=rollCount.current;
 
     if(diceInterval.current){clearInterval(diceInterval.current);diceInterval.current=null;}
     setRolling(true);setResult(null);setAltResults([]);setShowAlts(false);setLocked(false);setAltsLoading(false);
@@ -574,67 +539,34 @@ function DateDice(){
     }
 
     const cat=currentFilters.category||"Surprise Me";
-    let type;
-    if(cat==="Food & Drink")type="food";
-    else if(cat==="Activities")type="activity";
-    else type=Math.random()>0.45?"food":"activity";
+    const type=cat==="Food & Drink"?"food":cat==="Activities"?"activity":Math.random()>0.45?"food":"activity";
 
-    // Attempt the fetch — pass NO signal so aborting a prior controller cannot affect us
-    async function attempt(){
-      return new Promise(function(resolve,reject){
-        var done=false;
-        var tid=setTimeout(function(){
-          if(!done){done=true;reject(new Error("timeout"));}
-        },38000);
-        fetchSuggestion(type,currentFilters,currentUsed)
-          .then(function(r){if(!done){done=true;clearTimeout(tid);resolve(r);}})
-          .catch(function(e){if(!done){done=true;clearTimeout(tid);reject(e);}});
-      });
-    }
-
+    let res=null;
     try{
-      var res=null;
       // First attempt
-      try{ res=await attempt(); }
-      catch(firstErr){
-        if(rollCount.current!==thisRoll)return;
-        if(firstErr.message==="timeout"){throw firstErr;}
-        // Network error: brief pause then retry
-        await new Promise(function(r){setTimeout(r,1500);});
-        if(rollCount.current!==thisRoll)return;
-        res=await attempt();
-      }
-      // If first attempt returned null (API error, parse fail, etc), retry once after brief pause
-      if(!res||!res.name){
-        if(rollCount.current!==thisRoll)return;
+      res=await fetchSuggestion(type,currentFilters,currentUsed);
+      // If null, wait 1s and retry once
+      if(!res){
         await new Promise(function(r){setTimeout(r,1000);});
-        if(rollCount.current!==thisRoll)return;
-        try{ res=await attempt(); }catch(e){ /* will show error below */ }
-      }
-
-      if(rollCount.current!==thisRoll)return;
-      stopDice();
-      setRolling(false);
-
-      if(res&&res.name){
-        const newUsed=currentUsed.concat([res.name]);
-        usedNamesRef.current=newUsed;
-        setUsedNames(newUsed);
-        saveData("datedice:used",newUsed.slice(-200));
-        setResult(res);
-      }else{
-        setResult({name:"No match found",desc:"The search came back empty — try rolling again or adjusting your filters!",emoji:"🤔",cat:"Try Again",area:"NYC"});
+        if(rollCount.current!==myRoll)return;
+        res=await fetchSuggestion(type,currentFilters,currentUsed);
       }
     }catch(err){
-      if(rollCount.current!==thisRoll)return;
-      stopDice();
-      setRolling(false);
-      if(err.message==="timeout"){
-        setResult({name:"Search timed out",desc:"The AI is taking too long right now — tap Re-roll to try again!",emoji:"⏱",cat:"Timeout",area:"NYC"});
-        return;
-      }
-      console.error("doRoll error:",err);
-      setResult({name:"Something went wrong",desc:"Couldn't reach the search. Check your connection and tap Re-roll!",emoji:"😅",cat:"Error",area:"NYC"});
+      console.error("doRoll:",err);
+    }
+
+    if(rollCount.current!==myRoll)return; // a newer roll started — let it show its result
+    stopDice();
+    setRolling(false);
+
+    if(res&&res.name){
+      const newUsed=currentUsed.concat([res.name]);
+      usedNamesRef.current=newUsed;
+      setUsedNames(newUsed);
+      saveData("datedice:used",newUsed.slice(-200));
+      setResult(res);
+    }else{
+      setResult({name:"Nothing came back",desc:"The search didn't return a result — tap Re-roll to try again!",emoji:"🎲",cat:"Try Again",area:"NYC"});
     }
   },[]);  // Load one additional option on demand — fires only when user clicks, never during a roll
   const loadAlt=useCallback(async function(){
