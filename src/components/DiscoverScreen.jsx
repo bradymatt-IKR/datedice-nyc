@@ -27,10 +27,12 @@ export default function DiscoverScreen({ onPickEvent }) {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
+  const [error, setError] = useState(null);
   const [query, setQuery] = useState("tonight");
   const [loadingMsg, setLoadingMsg] = useState(LOADING_MESSAGES[0]);
   const [loadingEmoji, setLoadingEmoji] = useState(DISCOVER_EMOJI[0]);
   const msgInterval = useRef(null);
+  const abortRef = useRef(null);
 
   useEffect(() => {
     if (loading) {
@@ -49,32 +51,49 @@ export default function DiscoverScreen({ onPickEvent }) {
   }, [loading]);
 
   const searchEvents = async () => {
+    if (abortRef.current) abortRef.current.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    const timeout = setTimeout(() => controller.abort(), 45000);
+
     setLoading(true);
     setSearched(true);
+    setError(null);
     try {
       const resp = await fetch(API_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
         body: JSON.stringify({
-          model: "claude-sonnet-4-6",
+          model: "claude-haiku-4-5-20251001",
           max_tokens: 1000,
           tools: [{ type: "web_search_20250305", name: "web_search" }],
           messages: [{
             role: "user",
-            content: "Today is " + formatDate(new Date()) + ". List 6-8 specific NYC events, shows, exhibits, performances, or experiences likely happening " + query + " (" + getDateRangeLabel(query) + "). Draw on your knowledge of NYC's cultural calendar — museums with current exhibits, theaters with running shows, markets, music venues, seasonal events for " + getSeason() + ". Respond ONLY with a raw JSON array, no markdown, no backticks: [{\"name\":\"...\",\"desc\":\"...\",\"area\":\"...\",\"cat\":\"...\",\"cost\":\"...\",\"emoji\":\"...\"}]",
+            content: "Today is " + formatDate(new Date()) + ". Search the web and list 4-5 specific NYC events, shows, exhibits, performances, or experiences happening " + query + " (" + getDateRangeLabel(query) + "). Focus on current/real events — museums with exhibits, theaters with running shows, markets, music venues, seasonal events for " + getSeason() + ". Respond ONLY with a raw JSON array, no markdown, no backticks: [{\"name\":\"...\",\"desc\":\"...\",\"area\":\"...\",\"cat\":\"...\",\"cost\":\"...\",\"emoji\":\"...\"}]",
           }],
         }),
       });
-      if (!resp.ok) { console.error("Discover API error", resp.status); setEvents([]); setLoading(false); return; }
+      clearTimeout(timeout);
+      if (!resp.ok) {
+        console.error("Discover API error", resp.status);
+        setError("Search failed (status " + resp.status + "). Tap retry to try again.");
+        setLoading(false);
+        return;
+      }
       const data = await resp.json();
-      if (data.error) { setEvents([]); setLoading(false); return; }
+      if (data.error) {
+        setError(typeof data.error === "string" ? data.error : "Something went wrong. Tap retry.");
+        setLoading(false);
+        return;
+      }
       const rawText = (data.content || []).map((b) => (b.type === "text" ? b.text : "")).join("");
       const cleaned = stripCites(rawText).replace(/```json|```/g, "").trim();
       const match = cleaned.match(/\[[\s\S]*\]/);
       if (match) {
         try {
           const parsed = JSON.parse(match[0]);
-          setEvents(parsed.slice(0, 8).map((ev) => ({
+          setEvents(parsed.slice(0, 6).map((ev) => ({
             name: stripCites(ev.name || ""),
             desc: stripCites(ev.desc || ""),
             area: stripCites(ev.area || ""),
@@ -84,15 +103,20 @@ export default function DiscoverScreen({ onPickEvent }) {
           })).filter((ev) => ev.name));
         } catch (e) {
           console.error("Discover JSON parse error:", e, match[0].slice(0, 300));
-          setEvents([]);
+          setError("Couldn't read results. Tap retry.");
         }
       } else {
         console.warn("Discover: no JSON array in response. Raw:", rawText.slice(0, 300));
-        setEvents([]);
+        setError("No results came back. Tap retry.");
       }
     } catch (err) {
-      console.error("Discover fetch error:", err);
-      setEvents([]);
+      clearTimeout(timeout);
+      if (err.name === "AbortError") {
+        setError("Search timed out — slow connection? Tap retry.");
+      } else {
+        console.error("Discover fetch error:", err);
+        setError("Connection failed. Check your signal and tap retry.");
+      }
     }
     setLoading(false);
   };
@@ -124,11 +148,18 @@ export default function DiscoverScreen({ onPickEvent }) {
             <p style={{ color: P.textDim, fontFamily: sans, fontSize: "14px", transition: "opacity 0.3s" }}>{loadingMsg}</p>
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-            {[0, 0.1, 0.2, 0.3, 0.4, 0.5].map((d, i) => <SkeletonCard key={i} delay={d} />)}
+            {[0, 0.1, 0.2, 0.3, 0.4].map((d, i) => <SkeletonCard key={i} delay={d} />)}
           </div>
         </div>
       )}
-      {!loading && searched && events.length === 0 && (
+      {!loading && error && (
+        <div style={{ textAlign: "center", padding: "32px 20px", color: P.textDim, fontFamily: sans }}>
+          <div style={{ fontSize: "28px", marginBottom: "12px" }} aria-hidden="true">😔</div>
+          <p style={{ marginBottom: "16px", fontSize: "14px", lineHeight: 1.5 }}>{error}</p>
+          <Btn primary onClick={searchEvents} style={{ padding: "12px 32px", fontSize: "14px" }}>🔄 Retry</Btn>
+        </div>
+      )}
+      {!loading && !error && searched && events.length === 0 && (
         <div style={{ textAlign: "center", padding: "40px", color: P.textDim, fontFamily: sans }}>No events found — try another timeframe!</div>
       )}
       <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
