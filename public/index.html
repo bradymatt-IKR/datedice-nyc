@@ -36,6 +36,21 @@
     }
     #root{min-height:100vh}
 
+    /* ── SHIMMER / SKELETON ── */
+    @keyframes shimmer{0%{background-position:-400px 0}100%{background-position:400px 0}}
+    .skeleton-line{height:14px;border-radius:7px;background:linear-gradient(90deg,rgba(255,255,255,0.04) 25%,rgba(255,255,255,0.1) 50%,rgba(255,255,255,0.04) 75%);background-size:400px 100%;animation:shimmer 1.8s ease-in-out infinite;margin-bottom:10px;}
+    .skeleton-line.w60{width:60%}.skeleton-line.w80{width:80%}.skeleton-line.w40{width:40%}.skeleton-line.w100{width:100%}
+    .skeleton-card{background:linear-gradient(135deg,rgba(232,195,106,0.06),rgba(201,125,74,0.06));border:1px solid rgba(232,195,106,0.15);border-radius:20px;padding:28px 24px;}
+    .skeleton-emoji{width:44px;height:44px;border-radius:12px;background:rgba(255,255,255,0.06);animation:shimmer 1.8s ease-in-out infinite;background-size:400px 100%;margin-bottom:14px;}
+    /* ── TOAST ── */
+    @keyframes toastIn{from{opacity:0;transform:translateX(-50%) translateY(-20px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+    @keyframes toastOut{from{opacity:1;transform:translateX(-50%) translateY(0)}to{opacity:0;transform:translateX(-50%) translateY(-20px)}}
+    /* ── PULL REFRESH ── */
+    .pull-indicator{position:fixed;top:0;left:0;right:0;display:flex;justify-content:center;padding:12px;z-index:250;pointer-events:none;transition:opacity 0.2s,transform 0.2s;}
+    /* ── HEART BUTTON ── */
+    @keyframes heartPop{0%{transform:scale(1)}50%{transform:scale(1.3)}100%{transform:scale(1)}}
+    .heart-pop{animation:heartPop 0.3s ease;}
+
     /* ── DESKTOP LAYOUT ── */
     @media(min-width:768px){
       .app-shell{display:flex;min-height:100vh;}
@@ -216,6 +231,43 @@ const FILTERS_MAIN={
   duration:{label:"How Long",icon:"⏳",options:["Quick (1-2 hrs)","Half Day","Full Day","All Night"]},
 };
 
+// ── FAVORITES ──
+function loadFavorites(){return loadData("datedice:favorites",[]);}
+function saveFavorites(favs){saveData("datedice:favorites",favs);}
+function isFavorite(favs,name){return favs.some(function(f){return f.name===name;});}
+
+// ── COUPLES MODE ──
+function encodeShareLink(result){
+  try{
+    const data={n:result.name,d:result.desc,a:result.area,ad:result.address,c:result.cat,e:result.emoji,t:result.tip,cu:result.cuisine,p:result.priceRange,bu:result.bookingUrl,bp:result.bookingPlatform};
+    return window.location.origin+window.location.pathname+"#share="+btoa(unescape(encodeURIComponent(JSON.stringify(data))));
+  }catch(e){return null;}
+}
+function decodeShareLink(){
+  try{
+    const h=window.location.hash;
+    if(!h.startsWith("#share="))return null;
+    const json=decodeURIComponent(escape(atob(h.slice(7))));
+    const d=JSON.parse(json);
+    return{name:d.n,desc:d.d,area:d.a,address:d.ad,cat:d.c,emoji:d.e,tip:d.t,cuisine:d.cu,priceRange:d.p,bookingUrl:d.bu,bookingPlatform:d.bp};
+  }catch(e){return null;}
+}
+
+// ── SKELETON CARD ──
+const SkeletonCard=()=>(
+  <div className="skeleton-card" style={{animation:"fadeUp 0.4s ease both"}}>
+    <div className="skeleton-emoji"/>
+    <div className="skeleton-line w40" style={{height:"10px",marginBottom:"12px"}}/>
+    <div className="skeleton-line w60" style={{height:"22px",marginBottom:"8px"}}/>
+    <div className="skeleton-line w80" style={{height:"12px"}}/>
+    <div style={{marginTop:"16px"}}>
+      <div className="skeleton-line w100"/>
+      <div className="skeleton-line w80"/>
+    </div>
+    <div className="skeleton-line w60" style={{marginTop:"12px",height:"12px"}}/>
+  </div>
+);
+
 // ── COMPONENTS ──
 function Btn({children,primary,small,disabled,style,...props}){
   return React.createElement("button",Object.assign({},props,{disabled:disabled,style:Object.assign({background:primary?P.grad:"rgba(255,255,255,0.06)",color:primary?"#1a1a2e":P.text,border:primary?"none":"1px solid "+P.border,padding:small?"8px 16px":"14px 32px",borderRadius:"50px",fontSize:small?"13px":"15px",fontWeight:primary?"700":"500",fontFamily:sans,letterSpacing:"0.04em",cursor:disabled?"not-allowed":"pointer",opacity:disabled?0.4:1,transition:"all 0.2s"},style||{})}),children);
@@ -366,7 +418,7 @@ const MiniCalendar=({history})=>{
 };
 
 // ── RESULT CARD ──
-const ResultCard=({result,onReroll,onLockIn,onShare,onTweakFilters,onLoadAlt,locked,rolling:isRolling,altsLoading})=>{
+const ResultCard=({result,onReroll,onLockIn,onShare,onTweakFilters,onLoadAlt,locked,rolling:isRolling,altsLoading,onFavorite,isFav,onShareLink})=>{
   const booking=getBookingInfo(result);
   return(
   <div style={{animation:"fadeUp 0.6s ease both"}}>
@@ -375,7 +427,10 @@ const ResultCard=({result,onReroll,onLockIn,onShare,onTweakFilters,onLoadAlt,loc
       <div style={{fontSize:"11px",textTransform:"uppercase",letterSpacing:"0.2em",color:P.accent,marginBottom:"6px",fontFamily:sans}}>
         {result.cat}{result.cuisine?" · "+result.cuisine:""}{result.priceRange?" · "+result.priceRange:""}
       </div>
-      <h3 style={{fontSize:"24px",fontWeight:"400",margin:"0 0 6px",color:P.goldBright,fontFamily:serif}}>{result.name}</h3>
+      <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:"8px"}}>
+        <h3 style={{fontSize:"24px",fontWeight:"400",margin:"0 0 6px",color:P.goldBright,fontFamily:serif,flex:1}}>{result.name}</h3>
+        {onFavorite&&<button className={isFav?"heart-pop":""} onClick={function(e){e.stopPropagation();onFavorite(result);}} style={{background:"none",border:"none",fontSize:"24px",cursor:"pointer",padding:"2px 4px",flexShrink:0,transition:"transform 0.2s",filter:isFav?"none":"grayscale(1) opacity(0.5)"}} title={isFav?"Remove from wishlist":"Add to wishlist"}>{isFav?"❤️":"🤍"}</button>}
+      </div>
       <div style={{fontSize:"13px",color:P.textDim,marginBottom:"4px",fontFamily:sans}}>📍 {result.area}{result.address&&result.address!==result.area?" — "+result.address:""}</div>
       <p style={{fontSize:"15px",lineHeight:1.7,color:"rgba(240,236,226,0.8)",margin:"12px 0 0",fontFamily:serif}}>{result.desc}</p>
       {result.tip&&<p style={{fontSize:"13px",lineHeight:1.6,color:P.accent,margin:"10px 0 0",fontFamily:sans}}>💡 {result.tip}</p>}
@@ -397,12 +452,20 @@ const ResultCard=({result,onReroll,onLockIn,onShare,onTweakFilters,onLoadAlt,loc
       </div>
     )}
 
+    {/* ── Map embed ── */}
+    {(result.address||result.area)&&(
+      <div style={{marginBottom:"8px",borderRadius:"14px",overflow:"hidden",border:"1px solid "+P.border}}>
+        <iframe src={"https://maps.google.com/maps?q="+encodeURIComponent((result.address||result.name)+(result.area?", "+result.area:"")+", New York, NY")+"&z=15&output=embed"} width="100%" height="180" style={{border:0,display:"block",filter:"invert(0.9) hue-rotate(180deg) brightness(1.1) contrast(1.1)"}} loading="lazy" referrerPolicy="no-referrer" title="Map"/>
+      </div>
+    )}
+
     <div style={{display:"flex",gap:"8px",marginBottom:"8px"}}>
       <Btn onClick={onReroll} disabled={isRolling} style={{flex:1}}>{isRolling?"Finding...":"🎲 Re-roll"}</Btn>
       <Btn primary onClick={locked?undefined:onLockIn} style={{flex:1,opacity:locked?0.6:1,cursor:locked?"default":"pointer"}}>{locked?"✓ Locked In":"🔒 Lock It In"}</Btn>
     </div>
     <div style={{display:"flex",gap:"8px",flexWrap:"wrap",marginBottom:"8px"}}>
-      <Btn small onClick={onShare} style={{flex:"1 1 auto",fontSize:"12px"}}>📤 Share</Btn>
+      <Btn small onClick={onShare} style={{flex:"1 1 auto",fontSize:"12px"}}>📋 Copy</Btn>
+      {onShareLink&&<Btn small onClick={function(){onShareLink(result);}} style={{flex:"1 1 auto",fontSize:"12px"}}>💌 Share Link</Btn>}
       <Btn small onClick={function(){window.open("https://www.google.com/search?q="+encodeURIComponent(result.name+(result.address?" "+result.address:" NYC")),"_blank");}} style={{flex:"1 1 auto",fontSize:"12px"}}>🔎 Look Up</Btn>
       <Btn small onClick={function(){const now=new Date(),s=new Date(now),e=new Date(now);s.setHours(19,0,0,0);e.setHours(22,0,0,0);const fmt=function(d){return d.toISOString().replace(/[-:]/g,"").replace(/\.\d+/,"");};window.open("https://calendar.google.com/calendar/render?action=TEMPLATE&text="+encodeURIComponent("Date Night: "+result.name)+"&dates="+fmt(s)+"/"+fmt(e)+"&details="+encodeURIComponent(result.desc+(result.tip?"\n\nTip: "+result.tip:""))+"&location="+encodeURIComponent((result.address||result.area)+", New York, NY"),"_blank");}} style={{flex:"1 1 auto",fontSize:"12px"}}>📅 Google Cal</Btn>
     </div>
@@ -489,10 +552,20 @@ function DateDice(){
   const[weatherLoading,setWeatherLoading]=useState(true);
   const[locked,setLocked]=useState(false);
   const[toast,setToast]=useState(null);
+  const[toastFading,setToastFading]=useState(false);
   const[usedNames,setUsedNames]=useState([]);
+  const[favorites,setFavorites]=useState([]);
+  const[calendarView,setCalendarView]=useState("dates");
+  const[journalEditing,setJournalEditing]=useState(null);
+  const[journalText,setJournalText]=useState("");
+  const[sharedResult,setSharedResult]=useState(null);
   const[showNeighborhoods,setShowNeighborhoods]=useState(false);
   const[showCuisines,setShowCuisines]=useState(false);
   const[showActivityTypes,setShowActivityTypes]=useState(false);
+  const[pullDistance,setPullDistance]=useState(0);
+  const[isPulling,setIsPulling]=useState(false);
+  const pullStartY=useRef(0);
+  const pullRef=useRef(null);
   const diceInterval=useRef(null);
   const rollCount=useRef(0);
   // Always-fresh refs so doRoll never reads stale closure values
@@ -501,7 +574,19 @@ function DateDice(){
   useEffect(function(){filtersRef.current=filters;},[filters]);
   useEffect(function(){usedNamesRef.current=usedNames;},[usedNames]);
 
-  useEffect(function(){setHistory(loadData("datedice:history",[]));setUsedNames(loadData("datedice:used",[]));;},[]);
+  useEffect(function(){
+    setHistory(loadData("datedice:history",[]));
+    setUsedNames(loadData("datedice:used",[]));
+    setFavorites(loadFavorites());
+    // Couples mode: check for shared link
+    const shared=decodeShareLink();
+    if(shared&&shared.name){
+      setSharedResult(shared);
+      setScreen("app");setTab("roll");setSubScreen("rolling");
+      setResult(shared);setRolling(false);
+      window.history.replaceState(null,"",window.location.pathname);
+    }
+  },[]);
   useEffect(function(){
     (async function(){try{
       const r=await fetch("https://api.open-meteo.com/v1/forecast?latitude=40.6782&longitude=-73.9442&current=temperature_2m,apparent_temperature,weather_code,relative_humidity_2m,wind_speed_10m,uv_index&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=America/New_York");
@@ -516,7 +601,26 @@ function DateDice(){
   // Cleanup interval on unmount
   useEffect(function(){return function(){if(diceInterval.current)clearInterval(diceInterval.current);};},[]);
 
-  const showToast=function(msg){setToast(msg);setTimeout(function(){setToast(null);},2500);};
+  // Pull-to-refresh handlers
+  const onTouchStart=useCallback(function(e){
+    if(rolling||window.scrollY>10)return;
+    pullStartY.current=e.touches[0].clientY;
+    setIsPulling(true);
+  },[rolling]);
+  const onTouchMove=useCallback(function(e){
+    if(!isPulling||rolling)return;
+    const dy=Math.max(0,e.touches[0].clientY-pullStartY.current);
+    setPullDistance(Math.min(dy*0.5,80));
+  },[isPulling,rolling]);
+  const onTouchEnd=useCallback(function(){
+    if(pullDistance>60&&!rolling&&result){
+      if(navigator.vibrate)try{navigator.vibrate(30);}catch(e){}
+      setLocked(false);setAltResults([]);setShowAlts(false);doRoll();
+    }
+    setPullDistance(0);setIsPulling(false);
+  },[pullDistance,rolling,result]);
+
+  const showToast=function(msg){setToast(msg);setToastFading(false);setTimeout(function(){setToastFading(true);setTimeout(function(){setToast(null);setToastFading(false);},300);},2200);};
 
   const doRoll=useCallback(async function(){
     // Each roll gets a unique ID; stale async work checks this and bails
@@ -527,6 +631,8 @@ function DateDice(){
     const currentUsed=[...usedNamesRef.current];
 
     if(diceInterval.current){clearInterval(diceInterval.current);diceInterval.current=null;}
+    // Haptic feedback on mobile
+    if(navigator.vibrate)try{navigator.vibrate([50,30,50]);}catch(e){}
     setRolling(true);setResult(null);setAltResults([]);setShowAlts(false);setLocked(false);setAltsLoading(false);
 
     diceInterval.current=setInterval(function(){
@@ -610,6 +716,31 @@ function DateDice(){
   const removeEntry=function(id){const next=history.filter(function(h){return h.id!==id;});setHistory(next);saveData("datedice:history",next);showToast("Removed.");};
   const sharePlan=function(item){const text="🎲 Date Dice picked:\n\n"+(item.emoji||"🎲")+" "+item.name+"\n📍 "+item.area+(item.address&&item.address!==item.area?"\n📫 "+item.address:"")+"\n\n"+item.desc+(item.tip?"\n\n💡 "+item.tip:"")+"\n\nLet's do this! 💛";navigator.clipboard.writeText(text).then(function(){showToast("📋 Copied to clipboard!");}).catch(function(){showToast("Couldn't copy — try long-press");});};
 
+  // ── FAVORITES ──
+  const toggleFavorite=function(item){
+    const exists=isFavorite(favorites,item.name);
+    let next;
+    if(exists){next=favorites.filter(function(f){return f.name!==item.name;});showToast("Removed from wishlist");}
+    else{next=[Object.assign({},item,{favAt:new Date().toISOString()})].concat(favorites);showToast("❤️ Added to wishlist!");}
+    setFavorites(next);saveFavorites(next);
+  };
+  const removeFavorite=function(name){
+    const next=favorites.filter(function(f){return f.name!==name;});
+    setFavorites(next);saveFavorites(next);showToast("Removed from wishlist");
+  };
+
+  // ── COUPLES MODE SHARE LINK ──
+  const shareLink=function(item){
+    const url=encodeShareLink(item);
+    if(url){navigator.clipboard.writeText(url).then(function(){showToast("💌 Share link copied!");}).catch(function(){showToast("Couldn't copy link");});}
+  };
+
+  // ── JOURNAL ──
+  const saveJournal=function(id,note){
+    const next=history.map(function(h){return h.id===id?Object.assign({},h,{journal:note}):h;});
+    setHistory(next);saveData("datedice:history",next);setJournalEditing(null);showToast("📝 Note saved!");
+  };
+
   const handleTabChange=function(t){setTab(t);if(t==="roll")setSubScreen("filters");};
 
   const pageStyle={minHeight:"100vh",background:"radial-gradient(ellipse at 20% 0%,rgba(232,195,106,0.05) 0%,transparent 50%),radial-gradient(ellipse at 80% 100%,rgba(201,125,74,0.05) 0%,transparent 50%),"+P.bg,color:P.text,fontFamily:serif};
@@ -632,7 +763,7 @@ function DateDice(){
   const activeFilterCount=Object.values(filters).filter(Boolean).length;
 
   return(<div style={pageStyle}>
-    {toast&&<div style={{position:"fixed",top:"16px",left:"50%",transform:"translateX(-50%)",zIndex:200,background:"rgba(15,15,28,0.95)",border:"1px solid "+P.goldDim,borderRadius:"14px",padding:"12px 24px",fontFamily:sans,fontSize:"14px",color:P.gold,boxShadow:"0 8px 32px rgba(0,0,0,0.4)",animation:"fadeUp 0.3s ease",backdropFilter:"blur(12px)"}}>{toast}</div>}
+    {toast&&<div style={{position:"fixed",top:"16px",left:"50%",transform:"translateX(-50%)",zIndex:200,background:"rgba(15,15,28,0.97)",border:"1px solid "+P.goldDim,borderRadius:"16px",padding:"14px 28px",fontFamily:sans,fontSize:"14px",color:P.gold,boxShadow:"0 8px 32px rgba(0,0,0,0.5),0 0 0 1px rgba(232,195,106,0.1)",animation:(toastFading?"toastOut":"toastIn")+" 0.3s ease forwards",backdropFilter:"blur(16px)"}}>{toast}</div>}
 
     <div className="app-shell">
       {/* Desktop side nav */}
@@ -712,11 +843,23 @@ function DateDice(){
             </div>
           )}
           <Btn primary onClick={function(){setSubScreen("rolling");doRoll();}} style={{width:"100%",padding:"16px",fontSize:"16px",boxShadow:"0 4px 24px rgba(232,195,106,0.3)",marginTop:"8px"}}>
-            🎲 Roll the Dice {activeFilterCount>0?"("+activeFilterCount+" set)":"— Totally Random"}
+            🎲 Roll the Dice {activeFilterCount>0?"("+activeFilterCount+" set)":""}
           </Btn>
+          {activeFilterCount>0&&(
+            <button onClick={function(){setFilters({});setSubScreen("rolling");setTimeout(doRoll,50);}} style={{width:"100%",marginTop:"8px",background:"rgba(212,114,126,0.1)",border:"1px dashed rgba(212,114,126,0.3)",borderRadius:"50px",padding:"14px",color:P.rose,fontSize:"14px",fontWeight:"600",fontFamily:sans,cursor:"pointer",transition:"all 0.2s"}}>
+              🎰 Surprise Me — Clear All &amp; Roll Random
+            </button>
+          )}
         </div>)}
 
-        {tab==="roll"&&subScreen==="rolling"&&(<div>
+        {tab==="roll"&&subScreen==="rolling"&&(<div onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}>
+          {/* Pull-to-refresh indicator */}
+          {pullDistance>10&&!rolling&&result&&(
+            <div style={{textAlign:"center",padding:"8px 0 16px",opacity:Math.min(pullDistance/60,1),transform:"translateY("+Math.min(pullDistance*0.3,20)+"px)",transition:isPulling?"none":"all 0.3s"}}>
+              <span style={{fontSize:"20px",display:"inline-block",transform:"rotate("+Math.min(pullDistance*3,180)+"deg)",transition:isPulling?"none":"transform 0.3s"}}>{pullDistance>60?"🎲":"↓"}</span>
+              <div style={{fontSize:"11px",color:P.textDim,fontFamily:sans,marginTop:"4px"}}>{pullDistance>60?"Release to re-roll!":"Pull down to re-roll"}</div>
+            </div>
+          )}
           <button onClick={function(){
             if(diceInterval.current){clearInterval(diceInterval.current);diceInterval.current=null;}
             setSubScreen("filters");setResult(null);setRolling(false);setAltsLoading(false);
@@ -727,16 +870,22 @@ function DateDice(){
             <Dice3D value={diceVals[0]} rolling={rolling} size={82}/>
             <Dice3D value={diceVals[1]} rolling={rolling} size={82}/>
           </div>
-          {rolling&&<div style={{textAlign:"center"}}>
-            <p style={{color:P.goldBright,fontSize:"15px",fontStyle:"italic",animation:"pulse 1s infinite"}}>Finding your perfect spot...</p>
-            <p style={{color:P.textDim,fontSize:"12px",fontFamily:sans,marginTop:"4px"}}>
-              {filters.neighborhood?"In "+filters.neighborhood:"All of NYC"}
-              {filters.cuisine?" · "+filters.cuisine:""}
-              {filters.activityType?" · "+filters.activityType:""}
-            </p>
+          {rolling&&<div>
+            <SkeletonCard/>
+            <div style={{textAlign:"center",marginTop:"16px"}}>
+              <p style={{color:P.goldBright,fontSize:"14px",fontStyle:"italic",animation:"pulse 1s infinite"}}>Searching the city...</p>
+              <p style={{color:P.textDim,fontSize:"12px",fontFamily:sans,marginTop:"4px"}}>
+                {filters.neighborhood?"In "+filters.neighborhood:"All of NYC"}
+                {filters.cuisine?" · "+filters.cuisine:""}
+                {filters.activityType?" · "+filters.activityType:""}
+              </p>
+            </div>
           </div>}
           {result&&!rolling&&(<div>
             <ResultCard result={result} locked={locked} rolling={rolling} altsLoading={altsLoading}
+              isFav={isFavorite(favorites,result.name)}
+              onFavorite={toggleFavorite}
+              onShareLink={shareLink}
               onReroll={function(){setLocked(false);setAltResults([]);setShowAlts(false);doRoll();}}
               onLoadAlt={loadAlt}
               onLockIn={function(){lockIn(result);}}
@@ -758,32 +907,101 @@ function DateDice(){
 
         {tab==="calendar"&&(<div>
           <h2 style={{fontSize:"24px",fontWeight:"400",margin:"0 0 4px",color:P.gold}}>My Dates</h2>
-          <p style={{fontSize:"13px",color:P.textDim,margin:"0 0 20px",fontFamily:sans}}>Your date history & upcoming plans</p>
-          <div style={{background:P.card,border:"1px solid "+P.border,borderRadius:"16px",padding:"20px",marginBottom:"24px"}}><MiniCalendar history={history}/></div>
-          {history.length>0&&(<div style={{display:"flex",gap:"8px",marginBottom:"24px"}}>
-            {[{n:history.filter(function(h){return h.status==="locked";}).length,l:"Upcoming",c:P.gold},{n:history.filter(function(h){return h.status==="completed";}).length,l:"Completed",c:P.green},{n:history.length,l:"Total",c:P.blue}].map(function(s,i){return(
-              <div key={i} style={{flex:1,background:P.card,border:"1px solid "+P.border,borderRadius:"14px",padding:"14px",textAlign:"center"}}><div style={{fontSize:"24px",fontWeight:"700",color:s.c,fontFamily:sans}}>{s.n}</div><div style={{fontSize:"11px",color:P.textDim,fontFamily:sans,textTransform:"uppercase",letterSpacing:"0.1em"}}>{s.l}</div></div>
+          <p style={{fontSize:"13px",color:P.textDim,margin:"0 0 16px",fontFamily:sans}}>Your date history, wishlist & memories</p>
+
+          {/* Sub-tabs: Dates | Wishlist */}
+          <div style={{display:"flex",gap:"4px",marginBottom:"20px",background:P.card,borderRadius:"14px",padding:"4px",border:"1px solid "+P.border}}>
+            {[{id:"dates",label:"📅 Dates",count:history.length},{id:"wishlist",label:"❤️ Wishlist",count:favorites.length}].map(function(t){return(
+              <button key={t.id} onClick={function(){setCalendarView(t.id);}} style={{flex:1,background:calendarView===t.id?P.goldDim:"transparent",border:"none",borderRadius:"10px",padding:"10px 8px",color:calendarView===t.id?P.gold:P.textDim,fontSize:"13px",fontWeight:"600",fontFamily:sans,cursor:"pointer",transition:"all 0.2s"}}>{t.label}{t.count>0?" ("+t.count+")":""}</button>
             );})}
-          </div>)}
-          {history.length===0&&<div style={{textAlign:"center",padding:"40px 20px",color:P.textDim,fontFamily:sans}}><div style={{fontSize:"32px",marginBottom:"12px"}}>🎲</div><p>No dates yet! Roll the dice to get started.</p></div>}
-          <div style={{display:"flex",flexDirection:"column",gap:"10px"}}>
-            {history.map(function(h){return(
-              <div key={h.id} style={{background:P.card,border:"1px solid "+P.border,borderRadius:"16px",padding:"16px 18px"}}>
-                <div style={{display:"flex",alignItems:"flex-start",gap:"12px"}}>
-                  <span style={{fontSize:"28px"}}>{h.emoji||"🎉"}</span>
-                  <div style={{flex:1}}>
-                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:"8px"}}><div style={{fontFamily:sans,fontSize:"15px",color:P.text,fontWeight:"600"}}>{h.name}</div><span style={{fontSize:"10px",fontFamily:sans,fontWeight:"700",textTransform:"uppercase",letterSpacing:"0.1em",color:h.status==="completed"?P.green:P.gold,background:h.status==="completed"?"rgba(110,207,148,0.1)":P.goldDim,padding:"4px 10px",borderRadius:"20px",flexShrink:0}}>{h.status==="completed"?"Done":"Upcoming"}</span></div>
-                    <div style={{fontSize:"12px",color:P.textDim,fontFamily:sans,margin:"4px 0"}}>📍 {h.area}{h.address&&h.address!==h.area?" — "+h.address:""} · {new Date(h.lockedAt||h.completedAt).toLocaleDateString()}</div>
-                    {h.rating&&<div style={{fontSize:"13px",marginTop:"4px"}}>{"⭐".repeat(h.rating)}</div>}
-                    <div style={{display:"flex",gap:"6px",marginTop:"10px",flexWrap:"wrap",alignItems:"center"}}>
-                      {h.status==="locked"&&<div style={{display:"flex",gap:"4px",alignItems:"center"}}><span style={{fontSize:"11px",color:P.textDim,fontFamily:sans,marginRight:"2px"}}>Rate:</span>{[1,2,3,4,5].map(function(r){return(<button key={r} onClick={function(){markComplete(h.id,r);}} style={{background:"none",border:"1px solid "+P.border,borderRadius:"6px",padding:"3px 6px",cursor:"pointer",fontSize:"11px",lineHeight:1}}>{"★".repeat(r)}</button>);})}</div>}
-                      <button onClick={function(){removeEntry(h.id);}} style={{background:"none",border:"none",color:P.textDim,fontSize:"12px",cursor:"pointer",fontFamily:sans,marginLeft:"auto"}}>Remove</button>
+          </div>
+
+          {calendarView==="dates"&&(<div>
+            <div style={{background:P.card,border:"1px solid "+P.border,borderRadius:"16px",padding:"20px",marginBottom:"24px"}}><MiniCalendar history={history}/></div>
+            {history.length>0&&(<div style={{display:"flex",gap:"8px",marginBottom:"24px"}}>
+              {[{n:history.filter(function(h){return h.status==="locked";}).length,l:"Upcoming",c:P.gold},{n:history.filter(function(h){return h.status==="completed";}).length,l:"Completed",c:P.green},{n:history.length,l:"Total",c:P.blue}].map(function(s,i){return(
+                <div key={i} style={{flex:1,background:P.card,border:"1px solid "+P.border,borderRadius:"14px",padding:"14px",textAlign:"center"}}><div style={{fontSize:"24px",fontWeight:"700",color:s.c,fontFamily:sans}}>{s.n}</div><div style={{fontSize:"11px",color:P.textDim,fontFamily:sans,textTransform:"uppercase",letterSpacing:"0.1em"}}>{s.l}</div></div>
+              );})}
+            </div>)}
+
+            {/* Empty state */}
+            {history.length===0&&(<div style={{textAlign:"center",padding:"60px 20px",color:P.textDim,fontFamily:sans}}>
+              <div style={{fontSize:"56px",marginBottom:"16px",filter:"drop-shadow(0 0 20px rgba(232,195,106,0.2))"}}>🎲</div>
+              <h3 style={{fontSize:"18px",fontWeight:"400",color:P.text,fontFamily:serif,marginBottom:"8px"}}>No dates yet!</h3>
+              <p style={{fontSize:"14px",lineHeight:1.6,maxWidth:"280px",margin:"0 auto 24px"}}>Roll the dice and lock in your first date night. Your history and memories will show up here.</p>
+              <Btn primary onClick={function(){setTab("roll");setSubScreen("filters");}} style={{padding:"12px 32px"}}>🎲 Roll Your First Date</Btn>
+            </div>)}
+
+            {/* History entries */}
+            <div style={{display:"flex",flexDirection:"column",gap:"10px"}}>
+              {history.map(function(h){return(
+                <div key={h.id} style={{background:P.card,border:"1px solid "+P.border,borderRadius:"16px",padding:"16px 18px"}}>
+                  <div style={{display:"flex",alignItems:"flex-start",gap:"12px"}}>
+                    <span style={{fontSize:"28px"}}>{h.emoji||"🎉"}</span>
+                    <div style={{flex:1}}>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:"8px"}}><div style={{fontFamily:sans,fontSize:"15px",color:P.text,fontWeight:"600"}}>{h.name}</div><span style={{fontSize:"10px",fontFamily:sans,fontWeight:"700",textTransform:"uppercase",letterSpacing:"0.1em",color:h.status==="completed"?P.green:P.gold,background:h.status==="completed"?"rgba(110,207,148,0.1)":P.goldDim,padding:"4px 10px",borderRadius:"20px",flexShrink:0}}>{h.status==="completed"?"Done":"Upcoming"}</span></div>
+                      <div style={{fontSize:"12px",color:P.textDim,fontFamily:sans,margin:"4px 0"}}>📍 {h.area}{h.address&&h.address!==h.area?" — "+h.address:""} · {new Date(h.lockedAt||h.completedAt).toLocaleDateString()}</div>
+                      {h.rating&&<div style={{fontSize:"13px",marginTop:"4px"}}>{"⭐".repeat(h.rating)}</div>}
+
+                      {/* Journal / Notes */}
+                      {h.status==="completed"&&h.journal&&journalEditing!==h.id&&(
+                        <div style={{marginTop:"8px",background:"rgba(232,195,106,0.06)",border:"1px solid "+P.goldDim,borderRadius:"10px",padding:"10px 12px"}}>
+                          <div style={{fontSize:"11px",color:P.accent,fontFamily:sans,marginBottom:"4px",textTransform:"uppercase",letterSpacing:"0.1em"}}>📝 Date Night Notes</div>
+                          <p style={{fontSize:"13px",color:P.text,fontFamily:sans,lineHeight:1.5,margin:0,whiteSpace:"pre-wrap"}}>{h.journal}</p>
+                          <button onClick={function(){setJournalEditing(h.id);setJournalText(h.journal||"");}} style={{background:"none",border:"none",color:P.textDim,fontSize:"11px",cursor:"pointer",fontFamily:sans,marginTop:"6px",padding:0}}>Edit note</button>
+                        </div>
+                      )}
+                      {h.status==="completed"&&journalEditing===h.id&&(
+                        <div style={{marginTop:"8px"}}>
+                          <textarea value={journalText} onChange={function(e){setJournalText(e.target.value);}} placeholder="How was the date? Any memorable moments..." rows={3} style={{width:"100%",background:"rgba(255,255,255,0.04)",border:"1px solid "+P.border,borderRadius:"10px",padding:"10px 12px",color:P.text,fontSize:"13px",fontFamily:sans,resize:"vertical",outline:"none"}}/>
+                          <div style={{display:"flex",gap:"6px",marginTop:"6px"}}>
+                            <Btn small primary onClick={function(){saveJournal(h.id,journalText);}}>Save</Btn>
+                            <Btn small onClick={function(){setJournalEditing(null);}}>Cancel</Btn>
+                          </div>
+                        </div>
+                      )}
+                      {h.status==="completed"&&!h.journal&&journalEditing!==h.id&&(
+                        <button onClick={function(){setJournalEditing(h.id);setJournalText("");}} style={{background:"none",border:"1px dashed "+P.border,borderRadius:"8px",padding:"6px 10px",color:P.textDim,fontSize:"11px",cursor:"pointer",fontFamily:sans,marginTop:"8px"}}>📝 Add a note about this date</button>
+                      )}
+
+                      <div style={{display:"flex",gap:"6px",marginTop:"10px",flexWrap:"wrap",alignItems:"center"}}>
+                        {h.status==="locked"&&<div style={{display:"flex",gap:"4px",alignItems:"center"}}><span style={{fontSize:"11px",color:P.textDim,fontFamily:sans,marginRight:"2px"}}>Rate:</span>{[1,2,3,4,5].map(function(r){return(<button key={r} onClick={function(){markComplete(h.id,r);}} style={{background:"none",border:"1px solid "+P.border,borderRadius:"6px",padding:"3px 6px",cursor:"pointer",fontSize:"11px",lineHeight:1}}>{"★".repeat(r)}</button>);})}</div>}
+                        <button onClick={function(){removeEntry(h.id);}} style={{background:"none",border:"none",color:P.textDim,fontSize:"12px",cursor:"pointer",fontFamily:sans,marginLeft:"auto"}}>Remove</button>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            );})}
-          </div>
+              );})}
+            </div>
+          </div>)}
+
+          {/* Wishlist / Favorites */}
+          {calendarView==="wishlist"&&(<div>
+            {favorites.length===0&&(<div style={{textAlign:"center",padding:"60px 20px",color:P.textDim,fontFamily:sans}}>
+              <div style={{fontSize:"48px",marginBottom:"16px"}}>🤍</div>
+              <h3 style={{fontSize:"18px",fontWeight:"400",color:P.text,fontFamily:serif,marginBottom:"8px"}}>Your wishlist is empty</h3>
+              <p style={{fontSize:"14px",lineHeight:1.6,maxWidth:"280px",margin:"0 auto"}}>Tap the heart on any suggestion to save it here for later.</p>
+            </div>)}
+            <div style={{display:"flex",flexDirection:"column",gap:"10px"}}>
+              {favorites.map(function(f,i){return(
+                <div key={i} style={{background:P.card,border:"1px solid "+P.border,borderRadius:"16px",padding:"16px 18px"}}>
+                  <div style={{display:"flex",alignItems:"flex-start",gap:"12px"}}>
+                    <span style={{fontSize:"28px"}}>{f.emoji||"🎲"}</span>
+                    <div style={{flex:1}}>
+                      <div style={{fontFamily:sans,fontSize:"15px",color:P.text,fontWeight:"600",marginBottom:"4px"}}>{f.name}</div>
+                      <div style={{fontSize:"12px",color:P.textDim,fontFamily:sans,marginBottom:"4px"}}>📍 {f.area}{f.cuisine?" · "+f.cuisine:""}{f.priceRange?" · "+f.priceRange:""}</div>
+                      <p style={{fontSize:"13px",color:"rgba(240,236,226,0.7)",fontFamily:sans,lineHeight:1.5,margin:"0 0 8px"}}>{f.desc}</p>
+                      <div style={{display:"flex",gap:"6px",flexWrap:"wrap",alignItems:"center"}}>
+                        <Btn small primary onClick={function(){lockIn(f);showToast("🔒 Locked in from wishlist!");}} style={{fontSize:"11px"}}>🔒 Lock It In</Btn>
+                        <Btn small onClick={function(){sharePlan(f);}} style={{fontSize:"11px"}}>📋 Copy</Btn>
+                        <button onClick={function(){removeFavorite(f.name);}} style={{background:"none",border:"none",color:P.textDim,fontSize:"12px",cursor:"pointer",fontFamily:sans,marginLeft:"auto"}}>Remove</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );})}
+            </div>
+          </div>)}
         </div>)}
       </div>{/* end .main-content */}
     </div>{/* end .app-shell */}
