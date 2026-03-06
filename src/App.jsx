@@ -25,54 +25,6 @@ function getTimeTint() {
   return "rgba(106,130,232,0.05)"; // late night cool blue
 }
 
-// ── NYC Skyline SVG ──
-function NYCSkyline() {
-  return (
-    <svg className="nyc-skyline" viewBox="0 0 800 120" style={{ position: "absolute", bottom: 0, left: 0, width: "100%", height: "auto", maxHeight: "120px" }} aria-hidden="true">
-      <g fill="rgba(232,195,106,0.6)" stroke="none">
-        {/* Empire State */}
-        <rect x="380" y="10" width="8" height="110" />
-        <rect x="373" y="30" width="22" height="90" />
-        <rect x="365" y="50" width="38" height="70" />
-        {/* Chrysler */}
-        <rect x="305" y="25" width="6" height="95" />
-        <polygon points="298,45 318,45 311,25 305,25" />
-        <rect x="298" y="45" width="20" height="75" />
-        {/* One WTC */}
-        <rect x="150" y="5" width="4" height="115" />
-        <polygon points="140,35 168,35 156,5 152,5" />
-        <rect x="140" y="35" width="28" height="85" />
-        {/* Generic buildings */}
-        <rect x="50" y="60" width="30" height="60" />
-        <rect x="85" y="50" width="25" height="70" />
-        <rect x="115" y="70" width="20" height="50" />
-        <rect x="175" y="55" width="35" height="65" />
-        <rect x="215" y="65" width="22" height="55" />
-        <rect x="242" y="45" width="28" height="75" />
-        <rect x="275" y="60" width="18" height="60" />
-        <rect x="325" y="55" width="30" height="65" />
-        <rect x="410" y="60" width="28" height="60" />
-        <rect x="445" y="50" width="22" height="70" />
-        <rect x="475" y="65" width="35" height="55" />
-        <rect x="515" y="55" width="20" height="65" />
-        <rect x="540" y="70" width="30" height="50" />
-        <rect x="580" y="60" width="25" height="60" />
-        <rect x="610" y="45" width="35" height="75" />
-        <rect x="650" y="55" width="28" height="65" />
-        <rect x="685" y="65" width="22" height="55" />
-        <rect x="715" y="50" width="30" height="70" />
-        <rect x="750" y="60" width="25" height="60" />
-        {/* Brooklyn Bridge cables hint */}
-        <path d="M20,80 Q60,55 100,80" fill="none" stroke="rgba(232,195,106,0.4)" strokeWidth="1.5" />
-        <rect x="15" y="75" width="8" height="45" />
-        <rect x="95" y="75" width="8" height="45" />
-      </g>
-      {/* Ground line */}
-      <rect x="0" y="118" width="800" height="2" fill="rgba(232,195,106,0.3)" />
-    </svg>
-  );
-}
-
 export default function App() {
   const [screen, setScreen] = useState("home");
   const [tab, setTab] = useState("roll");
@@ -305,7 +257,7 @@ export default function App() {
   };
 
   const timeTint = getTimeTint();
-  const pageStyle = { minHeight: "100vh", background: `radial-gradient(ellipse at 20% 0%,${timeTint} 0%,transparent 50%),radial-gradient(ellipse at 80% 100%,rgba(201,125,74,0.05) 0%,transparent 50%),${P.bg}`, color: P.text, fontFamily: serif };
+  const pageStyle = { minHeight: "100vh", background: `radial-gradient(ellipse at 20% 0%,${timeTint} 0%,transparent 50%),radial-gradient(ellipse at 80% 100%,rgba(201,125,74,0.05) 0%,transparent 50%)`, color: P.text, fontFamily: serif, position: "relative" };
 
   // ── Home Screen ──
   if (screen === "home") {
@@ -321,8 +273,6 @@ export default function App() {
           <Btn primary onClick={() => setScreen("app")} style={{ padding: "16px 56px", fontSize: "16px", boxShadow: "0 4px 28px rgba(232,195,106,0.3)" }}>Let's Go</Btn>
           {weather && <p style={{ marginTop: "24px", fontSize: "13px", color: P.textDim, fontFamily: sans }}>{weather.wmoIcon} {weather.tempF}°F · {weather.classification} in Brooklyn</p>}
           {history.length > 0 && <p style={{ marginTop: "8px", fontSize: "13px", color: P.textDim, fontFamily: sans }}>{history.filter((h) => h.status === "completed").length} dates completed · {history.filter((h) => h.status === "locked").length} upcoming</p>}
-          {/* NYC Skyline */}
-          <NYCSkyline />
         </div>
       </div>
     );
