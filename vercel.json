@@ -1,6 +1,8 @@
 {
+  "framework": "vite",
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
+  "installCommand": "npm install",
   "functions": {
     "api/search.js": {
       "maxDuration": 60
