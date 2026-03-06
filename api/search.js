@@ -1,5 +1,4 @@
 export default async function handler(req, res) {
-  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -16,22 +15,37 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'ANTHROPIC_API_KEY not configured' });
   }
 
-  try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify(req.body),
-    });
+  const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
-    const data = await response.json();
+  // Retry up to 3 times on 429 with exponential backoff
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+        },
+        body: JSON.stringify(req.body),
+      });
 
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    return res.status(response.status).json(data);
-  } catch (error) {
-    return res.status(500).json({ error: 'Failed to reach Anthropic API' });
+      if (response.status === 429 && attempt < 2) {
+        // Wait 2s, then 4s before retrying
+        await sleep((attempt + 1) * 2000);
+        continue;
+      }
+
+      const data = await response.json();
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      return res.status(response.status).json(data);
+    } catch (error) {
+      if (attempt === 2) {
+        return res.status(500).json({ error: 'Failed to reach Anthropic API' });
+      }
+      await sleep((attempt + 1) * 2000);
+    }
   }
+
+  return res.status(429).json({ error: 'Rate limited — please try again in a moment' });
 }
