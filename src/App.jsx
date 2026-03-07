@@ -49,7 +49,6 @@ export default function App() {
   const [showNeighborhoods, setShowNeighborhoods] = useState(false);
   const [showCuisines, setShowCuisines] = useState(false);
   const [showActivityTypes, setShowActivityTypes] = useState(false);
-  const [streamText, setStreamText] = useState("");
   const [showConfetti, setShowConfetti] = useState(false);
   const [loadingMsg, setLoadingMsg] = useState(LOADING_MESSAGES[0]);
   const [loadingEmoji, setLoadingEmoji] = useState("🎲");
@@ -133,8 +132,7 @@ export default function App() {
       if (e.key === "Escape" && subScreen === "rolling") {
         e.preventDefault();
         if (diceInterval.current) { clearInterval(diceInterval.current); diceInterval.current = null; }
-        setSubScreen("filters"); setResult(null); setRolling(false); setAltsLoading(false); setStreamText("");
-      }
+        setSubScreen("filters"); setResult(null); setRolling(false); setAltsLoading(false);      }
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
@@ -178,7 +176,7 @@ export default function App() {
     const currentUsed = [...usedNamesRef.current];
 
     if (diceInterval.current) { clearInterval(diceInterval.current); diceInterval.current = null; }
-    setRolling(true); setResult(null); setAltResults([]); setLocked(false); setAltsLoading(false); setStreamText(""); setShowConfetti(false);
+    setRolling(true); setResult(null); setAltResults([]); setLocked(false); setAltsLoading(false); setShowConfetti(false);
     haptic([50, 30, 50]); // two quick taps at roll start
 
     diceInterval.current = setInterval(() => {
@@ -195,9 +193,7 @@ export default function App() {
 
     let res = null;
     try {
-      res = await fetchSuggestionStream(type, currentFilters, currentUsed, (text) => {
-        if (rollCount.current === myRoll) setStreamText(text);
-      });
+      res = await fetchSuggestionStream(type, currentFilters, currentUsed);
       if (!res) {
         res = await fetchSuggestion(type, currentFilters, currentUsed);
       }
@@ -213,8 +209,7 @@ export default function App() {
     if (rollCount.current !== myRoll) return;
     stopDice();
     setRolling(false);
-    setStreamText("");
-
+   
     if (res && res.name) {
       const newUsed = currentUsed.concat([res.name]);
       usedNamesRef.current = newUsed;
@@ -491,8 +486,7 @@ export default function App() {
             <div>
               <button onClick={() => {
                 if (diceInterval.current) { clearInterval(diceInterval.current); diceInterval.current = null; }
-                setSubScreen("filters"); setResult(null); setRolling(false); setAltsLoading(false); setStreamText("");
-              }} aria-label="Go back to filters" style={{ display: "inline-flex", alignItems: "center", gap: "6px", background: "rgba(255,255,255,0.05)", border: "1px solid " + P.border, borderRadius: "20px", padding: "8px 16px", color: P.textDim, fontSize: "13px", fontFamily: sans, cursor: "pointer", marginBottom: "28px", transition: "all 0.2s" }}>
+                setSubScreen("filters"); setResult(null); setRolling(false); setAltsLoading(false);              }} aria-label="Go back to filters" style={{ display: "inline-flex", alignItems: "center", gap: "6px", background: "rgba(255,255,255,0.05)", border: "1px solid " + P.border, borderRadius: "20px", padding: "8px 16px", color: P.textDim, fontSize: "13px", fontFamily: sans, cursor: "pointer", marginBottom: "28px", transition: "all 0.2s" }}>
                 ← Change Filters {activeFilterCount > 0 && <span style={{ background: P.goldDim, color: P.gold, borderRadius: "10px", padding: "1px 7px", fontSize: "11px", fontWeight: "700" }}>{activeFilterCount} set</span>}
               </button>
               <div style={{ display: "flex", justifyContent: "center", gap: "32px", marginBottom: "40px", opacity: result ? 0.2 : 1, transition: "opacity 0.7s" }}>
@@ -518,7 +512,7 @@ export default function App() {
                     onLoadAlt={loadAlt}
                     onLockIn={() => lockIn(result)}
                     onShare={() => sharePlan(result)}
-                    onTweakFilters={() => { setSubScreen("filters"); setResult(null); setRolling(false); setAltsLoading(false); setStreamText(""); if (diceInterval.current) { clearInterval(diceInterval.current); diceInterval.current = null; } }}
+                    onTweakFilters={() => { setSubScreen("filters"); setResult(null); setRolling(false); setAltsLoading(false); if (diceInterval.current) { clearInterval(diceInterval.current); diceInterval.current = null; } }}
                   />
                   {altResults.length > 0 && (
                     <div style={{ marginTop: "16px" }}>
