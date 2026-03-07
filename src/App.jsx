@@ -241,15 +241,17 @@ export default function App() {
     else type = Math.random() > 0.45 ? "food" : "activity";
     setAltsLoading(true);
     try {
-      const [alt1, alt2] = await Promise.all([
+      // Fetch 3 in parallel — dedup may discard one, so overshoot to reliably get 2
+      const results = await Promise.all([
+        fetchSuggestion(type, currentFilters, allUsed),
         fetchSuggestion(type, currentFilters, allUsed),
         fetchSuggestion(type, currentFilters, allUsed),
       ]);
       if (rollCount.current !== thisRoll) { setAltsLoading(false); return; }
       const newAlts = [];
       const seen = new Set(allUsed.map((n) => n.toLowerCase()));
-      [alt1, alt2].forEach((alt) => {
-        if (alt && alt.name && !seen.has(alt.name.toLowerCase())) {
+      results.forEach((alt) => {
+        if (alt && alt.name && !seen.has(alt.name.toLowerCase()) && newAlts.length < 2) {
           seen.add(alt.name.toLowerCase());
           newAlts.push(alt);
         }
@@ -506,11 +508,6 @@ export default function App() {
                     {filters.cuisine ? " · " + filters.cuisine : ""}
                     {filters.activityType ? " · " + filters.activityType : ""}
                   </p>
-                  {streamText && (
-                    <p style={{ color: P.textDim, fontSize: "11px", fontFamily: sans, marginTop: "12px", maxWidth: "400px", margin: "12px auto 0", opacity: 0.6, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {streamText.slice(-80)}...
-                    </p>
-                  )}
                 </div>
               )}
               {result && !rolling && (
@@ -537,17 +534,20 @@ export default function App() {
                             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setResult(alt); setLocked(false); } }}
                             aria-label={`Switch to ${alt.name}`}
                             style={{
-                              scrollSnapAlign: "start", flex: "0 0 200px", background: P.card, border: "1px solid " + P.border,
+                              scrollSnapAlign: "start", flex: "0 0 220px", background: P.card, border: "1px solid " + P.border,
                               borderRadius: "14px", padding: "14px 16px", cursor: "pointer",
-                              display: "flex", flexDirection: "column", gap: "8px",
+                              display: "flex", flexDirection: "column", gap: "6px",
                               transition: "border-color 0.2s, transform 0.15s",
                             }}
                             onMouseEnter={(e) => { e.currentTarget.style.borderColor = P.goldDim; e.currentTarget.style.transform = "translateY(-2px)"; }}
                             onMouseLeave={(e) => { e.currentTarget.style.borderColor = P.border; e.currentTarget.style.transform = "none"; }}
                           >
-                            <span style={{ fontSize: "28px" }} aria-hidden="true">{alt.emoji || "🎲"}</span>
-                            <div style={{ color: P.text, fontSize: "13px", fontWeight: "600", fontFamily: sans, lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{alt.name}</div>
-                            <div style={{ color: P.textDim, fontSize: "11px", fontFamily: sans }}>{alt.cuisine || alt.cat} · {alt.area}</div>
+                            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                              <span style={{ fontSize: "24px", flexShrink: 0 }} aria-hidden="true">{alt.emoji || "🎲"}</span>
+                              <div style={{ color: P.text, fontSize: "13px", fontWeight: "600", fontFamily: sans, lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{alt.name}</div>
+                            </div>
+                            {alt.desc && <div style={{ color: P.textDim, fontSize: "11px", fontFamily: sans, lineHeight: 1.4, overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{alt.desc}</div>}
+                            <div style={{ color: P.accent, fontSize: "11px", fontFamily: sans, marginTop: "auto" }}>📍 {alt.area} · {alt.cuisine || alt.cat}</div>
                           </div>
                         ))}
                       </div>
