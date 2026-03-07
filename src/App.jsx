@@ -16,6 +16,7 @@ import ResultCard from './components/ResultCard.jsx';
 import DiscoverScreen from './components/DiscoverScreen.jsx';
 import HistoryStats from './components/HistoryStats.jsx';
 import Confetti from './components/Confetti.jsx';
+import Onboarding from './components/Onboarding.jsx';
 
 // ── Haptic feedback (no-op on desktop/unsupported) ──
 function haptic(pattern) { if (navigator.vibrate) navigator.vibrate(pattern); }
@@ -39,7 +40,6 @@ export default function App() {
   const [diceVals, setDiceVals] = useState([3, 5]);
   const [result, setResult] = useState(null);
   const [altResults, setAltResults] = useState([]);
-  const [showAlts, setShowAlts] = useState(false);
   const [history, setHistory] = useState([]);
   const [weather, setWeather] = useState(null);
   const [weatherLoading, setWeatherLoading] = useState(true);
@@ -53,7 +53,11 @@ export default function App() {
   const [showConfetti, setShowConfetti] = useState(false);
   const [loadingMsg, setLoadingMsg] = useState(LOADING_MESSAGES[0]);
   const [loadingEmoji, setLoadingEmoji] = useState("🎲");
+  const [loadingFade, setLoadingFade] = useState(1);
   const [tabKey, setTabKey] = useState(0);
+  const [showOnboarding, setShowOnboarding] = useState(() => {
+    try { return !localStorage.getItem("datedice:onboarded"); } catch { return false; }
+  });
   const diceInterval = useRef(null);
   const rollCount = useRef(0);
   const filtersRef = useRef(filters);
@@ -135,7 +139,7 @@ export default function App() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [screen, tab, subScreen, rolling]);
 
-  // ── Rotating loading messages ──
+  // ── Rotating loading messages (crossfade) ──
   useEffect(() => {
     if (rolling) {
       const cat = filtersRef.current.category || "Surprise Me";
@@ -143,13 +147,19 @@ export default function App() {
       let idx = 0;
       setLoadingMsg(LOADING_MESSAGES[0]);
       setLoadingEmoji(emojiSet[0]);
+      setLoadingFade(1);
       loadingInterval.current = setInterval(() => {
-        idx = (idx + 1) % LOADING_MESSAGES.length;
-        setLoadingMsg(LOADING_MESSAGES[idx]);
-        setLoadingEmoji(emojiSet[idx % emojiSet.length]);
-      }, 2200);
+        setLoadingFade(0); // fade out
+        setTimeout(() => {
+          idx = (idx + 1) % LOADING_MESSAGES.length;
+          setLoadingMsg(LOADING_MESSAGES[idx]);
+          setLoadingEmoji(emojiSet[idx % emojiSet.length]);
+          setLoadingFade(1); // fade back in
+        }, 180);
+      }, 2400);
     } else {
       if (loadingInterval.current) clearInterval(loadingInterval.current);
+      setLoadingFade(1);
     }
     return () => { if (loadingInterval.current) clearInterval(loadingInterval.current); };
   }, [rolling]);
@@ -163,7 +173,7 @@ export default function App() {
     const currentUsed = [...usedNamesRef.current];
 
     if (diceInterval.current) { clearInterval(diceInterval.current); diceInterval.current = null; }
-    setRolling(true); setResult(null); setAltResults([]); setShowAlts(false); setLocked(false); setAltsLoading(false); setStreamText(""); setShowConfetti(false);
+    setRolling(true); setResult(null); setAltResults([]); setLocked(false); setAltsLoading(false); setStreamText(""); setShowConfetti(false);
     haptic([50, 30, 50]); // two quick taps at roll start
 
     diceInterval.current = setInterval(() => {
@@ -289,6 +299,7 @@ export default function App() {
   if (screen === "home") {
     return (
       <div style={pageStyle}>
+        {showOnboarding && <Onboarding onComplete={() => { setShowOnboarding(false); saveData("datedice:onboarded", true); }} />}
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "100vh", padding: "40px 20px", textAlign: "center", position: "relative", overflow: "hidden" }}>
           <div style={{ fontSize: "72px", marginBottom: "16px", filter: "drop-shadow(0 0 24px rgba(232,195,106,0.3))" }} aria-hidden="true">🎲</div>
           <h1 style={{ fontSize: "clamp(38px, 8vw, 58px)", fontWeight: "400", letterSpacing: "0.04em", margin: "0 0 8px", background: P.grad, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>Date Dice</h1>
@@ -460,8 +471,8 @@ export default function App() {
               </div>
               {rolling && (
                 <div style={{ textAlign: "center" }} role="status" aria-label="Finding your perfect spot">
-                  <div style={{ fontSize: "28px", marginBottom: "8px", transition: "all 0.3s" }} aria-hidden="true">{loadingEmoji}</div>
-                  <p style={{ color: P.goldBright, fontSize: "15px", fontStyle: "italic", animation: "pulse 1s infinite", transition: "opacity 0.3s" }}>{loadingMsg}</p>
+                  <div style={{ fontSize: "28px", marginBottom: "8px", opacity: loadingFade, transform: loadingFade ? "scale(1)" : "scale(0.85)", transition: "opacity 0.18s ease, transform 0.18s ease" }} aria-hidden="true">{loadingEmoji}</div>
+                  <p style={{ color: P.goldBright, fontSize: "15px", fontStyle: "italic", animation: "pulse 1s infinite", opacity: loadingFade, transition: "opacity 0.18s ease" }}>{loadingMsg}</p>
                   <p style={{ color: P.textDim, fontSize: "12px", fontFamily: sans, marginTop: "4px" }}>
                     {filters.neighborhood?.length > 0 ? "In " + (filters.neighborhood.length === 1 ? filters.neighborhood[0] : filters.neighborhood.length + " neighborhoods") : "All of NYC"}
                     {filters.cuisine ? " · " + filters.cuisine : ""}
@@ -478,7 +489,7 @@ export default function App() {
                 <div>
                   <ResultCard
                     result={result} locked={locked} rolling={rolling} altsLoading={altsLoading}
-                    onReroll={() => { setLocked(false); setAltResults([]); setShowAlts(false); doRoll(); }}
+                    onReroll={() => { setLocked(false); setAltResults([]); doRoll(); }}
                     onLoadAlt={loadAlt}
                     onLockIn={() => lockIn(result)}
                     onShare={() => sharePlan(result)}
@@ -486,18 +497,32 @@ export default function App() {
                   />
                   {altResults.length > 0 && (
                     <div style={{ marginTop: "16px" }}>
-                      <button onClick={() => setShowAlts(!showAlts)} aria-expanded={showAlts} style={{ background: "none", border: "none", color: P.textDim, fontSize: "12px", cursor: "pointer", fontFamily: sans, letterSpacing: "0.1em", textTransform: "uppercase", width: "100%", textAlign: "center", padding: "8px 0" }}>
-                        {showAlts ? "Hide" : "Show"} other picks ▾
-                      </button>
-                      {showAlts && altResults.map((alt, i) => (
-                        <div key={i} onClick={() => { setResult(alt); setShowAlts(false); setLocked(false); }} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setResult(alt); setShowAlts(false); setLocked(false); } }} aria-label={`Switch to ${alt.name}`} style={{ background: P.card, border: "1px solid " + P.border, borderRadius: "14px", padding: "14px 18px", cursor: "pointer", marginTop: "8px", display: "flex", alignItems: "center", gap: "12px" }}>
-                          <span style={{ fontSize: "26px" }} aria-hidden="true">{alt.emoji || "🎲"}</span>
-                          <div>
-                            <div style={{ color: P.text, fontSize: "14px", fontWeight: "500", fontFamily: sans }}>{alt.name}</div>
-                            <div style={{ color: P.textDim, fontSize: "12px", fontFamily: sans }}>{alt.cuisine || alt.cat} · {alt.area}</div>
+                      <div style={{ fontSize: "11px", color: P.textDim, fontFamily: sans, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "8px", paddingLeft: "2px" }}>
+                        Other picks ({altResults.length})
+                      </div>
+                      <div className="alt-scroll" style={{
+                        display: "flex", gap: "10px", overflowX: "auto", scrollSnapType: "x mandatory",
+                        WebkitOverflowScrolling: "touch", paddingBottom: "6px",
+                      }}>
+                        {altResults.map((alt, i) => (
+                          <div key={i} onClick={() => { setResult(alt); setLocked(false); }} role="button" tabIndex={0}
+                            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setResult(alt); setLocked(false); } }}
+                            aria-label={`Switch to ${alt.name}`}
+                            style={{
+                              scrollSnapAlign: "start", flex: "0 0 200px", background: P.card, border: "1px solid " + P.border,
+                              borderRadius: "14px", padding: "14px 16px", cursor: "pointer",
+                              display: "flex", flexDirection: "column", gap: "8px",
+                              transition: "border-color 0.2s, transform 0.15s",
+                            }}
+                            onMouseEnter={(e) => { e.currentTarget.style.borderColor = P.goldDim; e.currentTarget.style.transform = "translateY(-2px)"; }}
+                            onMouseLeave={(e) => { e.currentTarget.style.borderColor = P.border; e.currentTarget.style.transform = "none"; }}
+                          >
+                            <span style={{ fontSize: "28px" }} aria-hidden="true">{alt.emoji || "🎲"}</span>
+                            <div style={{ color: P.text, fontSize: "13px", fontWeight: "600", fontFamily: sans, lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{alt.name}</div>
+                            <div style={{ color: P.textDim, fontSize: "11px", fontFamily: sans }}>{alt.cuisine || alt.cat} · {alt.area}</div>
                           </div>
-                        </div>
-                      ))}
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>

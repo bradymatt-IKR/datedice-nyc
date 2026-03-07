@@ -5,7 +5,7 @@ import Btn from './Btn.jsx';
 export default function ResultCard({ result, onReroll, onLockIn, onShare, onTweakFilters, onLoadAlt, locked, rolling: isRolling, altsLoading }) {
   const booking = getBookingInfo(result);
   return (
-    <div style={{ animation: "fadeUp 0.6s ease both" }} role="article" aria-label={`Suggestion: ${result.name}`}>
+    <div style={{ animation: "cardDeal 0.55s cubic-bezier(0.22,0.61,0.36,1) both" }} role="article" aria-label={`Suggestion: ${result.name}`}>
       <div style={{ background: "linear-gradient(135deg, rgba(232,195,106,0.08), rgba(201,125,74,0.08))", border: "1px solid rgba(232,195,106,0.2)", borderRadius: "20px", padding: "28px 24px", marginBottom: "16px" }}>
         <div style={{ fontSize: "44px", marginBottom: "10px" }} aria-hidden="true">{result.emoji || "🎲"}</div>
         <div style={{ fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.2em", color: P.accent, marginBottom: "6px", fontFamily: sans }}>
@@ -43,7 +43,7 @@ export default function ResultCard({ result, onReroll, onLockIn, onShare, onTwea
 
       <div style={{ display: "flex", gap: "8px", marginBottom: "8px" }}>
         <Btn onClick={onReroll} disabled={isRolling} style={{ flex: 1 }}>{isRolling ? "Finding..." : "🎲 Re-roll"}</Btn>
-        <Btn primary onClick={locked ? undefined : onLockIn} style={{ flex: 1, opacity: locked ? 0.6 : 1, cursor: locked ? "default" : "pointer" }}>{locked ? "✓ Locked In" : "🔒 Lock It In"}</Btn>
+        <Btn primary onClick={locked ? undefined : onLockIn} style={{ flex: 1, opacity: locked ? 0.6 : 1, cursor: locked ? "default" : "pointer", animation: locked ? "none" : "lockGlow 2s ease-in-out infinite", borderRadius: "50px" }}>{locked ? "✓ Locked In" : "🔒 Lock It In"}</Btn>
       </div>
       <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "8px" }}>
         <Btn small onClick={onShare} style={{ flex: "1 1 auto", fontSize: "12px" }} aria-label="Share this suggestion">📤 Share</Btn>

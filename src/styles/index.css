@@ -120,24 +120,153 @@ body {
 .s5 { animation: star-twinkle-bright 4.8s ease-in-out infinite; animation-delay: 1.8s; }
 .beacon { animation: glow-pulse 2s ease-in-out infinite; }
 
-/* ── Shooting Stars ── */
-@keyframes shooting-star {
-  0%   { transform: translateX(0) translateY(0) rotate(-35deg); opacity: 0; width: 0; }
-  3%   { opacity: 1; width: 80px; }
+/* ── Shooting Stars (6 unique variants) ── */
+@keyframes shooting-star-1 {
+  0%   { transform: translateX(0) translateY(0) rotate(-32deg); opacity: 0; width: 0; }
+  3%   { opacity: 1; width: 100px; }
   12%  { opacity: 0.8; }
-  18%  { opacity: 0; transform: translateX(280px) translateY(160px) rotate(-35deg); width: 80px; }
-  100% { opacity: 0; transform: translateX(280px) translateY(160px) rotate(-35deg); width: 0; }
+  18%  { opacity: 0; transform: translateX(300px) translateY(170px) rotate(-32deg); width: 100px; }
+  100% { opacity: 0; transform: translateX(300px) translateY(170px) rotate(-32deg); width: 0; }
+}
+@keyframes shooting-star-2 {
+  0%   { transform: translateX(0) translateY(0) rotate(-38deg); opacity: 0; width: 0; }
+  2%   { opacity: 1; width: 50px; }
+  8%   { opacity: 0.8; }
+  14%  { opacity: 0; transform: translateX(200px) translateY(140px) rotate(-38deg); width: 50px; }
+  100% { opacity: 0; transform: translateX(200px) translateY(140px) rotate(-38deg); width: 0; }
+}
+@keyframes shooting-star-3 {
+  0%   { transform: translateX(0) translateY(0) rotate(-30deg); opacity: 0; width: 0; }
+  3%   { opacity: 1; width: 120px; }
+  14%  { opacity: 0.8; }
+  20%  { opacity: 0; transform: translateX(340px) translateY(190px) rotate(-30deg); width: 120px; }
+  100% { opacity: 0; transform: translateX(340px) translateY(190px) rotate(-30deg); width: 0; }
+}
+@keyframes shooting-star-4 {
+  0%   { transform: translateX(0) translateY(0) rotate(-42deg); opacity: 0; width: 0; }
+  2%   { opacity: 1; width: 60px; }
+  9%   { opacity: 0.8; }
+  15%  { opacity: 0; transform: translateX(220px) translateY(180px) rotate(-42deg); width: 60px; }
+  100% { opacity: 0; transform: translateX(220px) translateY(180px) rotate(-42deg); width: 0; }
+}
+@keyframes shooting-star-5 {
+  0%   { transform: translateX(0) translateY(0) rotate(-35deg); opacity: 0; width: 0; }
+  3%   { opacity: 1; width: 90px; }
+  11%  { opacity: 0.8; }
+  17%  { opacity: 0; transform: translateX(260px) translateY(155px) rotate(-35deg); width: 90px; }
+  100% { opacity: 0; transform: translateX(260px) translateY(155px) rotate(-35deg); width: 0; }
+}
+@keyframes shooting-star-6 {
+  0%   { transform: translateX(0) translateY(0) rotate(-33deg); opacity: 0; width: 0; }
+  2%   { opacity: 1; width: 70px; }
+  10%  { opacity: 0.8; }
+  16%  { opacity: 0; transform: translateX(240px) translateY(145px) rotate(-33deg); width: 70px; }
+  100% { opacity: 0; transform: translateX(240px) translateY(145px) rotate(-33deg); width: 0; }
 }
 .shooting-star {
-  position: absolute; height: 1px; pointer-events: none; border-radius: 1px;
-  background: linear-gradient(90deg, rgba(255,255,255,0.9), rgba(255,255,255,0.3), transparent);
-  box-shadow: 0 0 6px 1px rgba(232,195,106,0.4), 0 0 12px 2px rgba(232,195,106,0.15);
+  position: absolute; height: 2px; pointer-events: none; border-radius: 1px;
+  background: linear-gradient(90deg, rgba(255,253,240,1) 0%, rgba(245,217,138,0.9) 20%, rgba(232,195,106,0.5) 60%, transparent 100%);
+  box-shadow: 0 0 8px 2px rgba(255,253,240,0.6), 0 0 22px 4px rgba(232,195,106,0.35);
   opacity: 0;
 }
-.ss1 { top: 8%;  left: 12%; animation: shooting-star 14s  3s  ease-out infinite; }
-.ss2 { top: 14%; left: 52%; animation: shooting-star 20s  9s  ease-out infinite; }
-.ss3 { top: 5%;  left: 32%; animation: shooting-star 26s  0s  ease-out infinite; }
-.ss4 { top: 18%; left: 72%; animation: shooting-star 34s  16s ease-out infinite; }
+.shooting-star::after {
+  content: ''; position: absolute; right: -4px; top: -1px;
+  width: 4px; height: 4px; background: rgba(255,253,240,0.8);
+  border-radius: 50%; box-shadow: 0 0 6px 2px rgba(245,217,138,0.5);
+}
+.ss1 { top: 8%;  left: 12%; animation: shooting-star-1 14s 3s  ease-out infinite; }
+.ss2 { top: 14%; left: 52%; animation: shooting-star-2 18s 9s  ease-out infinite; }
+.ss3 { top: 5%;  left: 32%; animation: shooting-star-3 26s 0s  ease-out infinite; }
+.ss4 { top: 18%; left: 72%; animation: shooting-star-4 30s 16s ease-out infinite; }
+.ss5 { top: 10%; left: 85%; animation: shooting-star-5 22s 6s  ease-out infinite; }
+.ss6 { top: 3%;  left: 45%; animation: shooting-star-6 38s 20s ease-out infinite; }
+
+/* ── Card Deal Entrance ── */
+@keyframes cardDeal {
+  0%   { opacity: 0; transform: perspective(800px) rotateX(8deg) scale(0.92) translateY(16px); }
+  60%  { opacity: 1; transform: perspective(800px) rotateX(-1.5deg) scale(1.01) translateY(-2px); }
+  100% { opacity: 1; transform: perspective(800px) rotateX(0deg) scale(1) translateY(0); }
+}
+
+/* ── Lock It In Glow ── */
+@keyframes lockGlow {
+  0%, 100% { box-shadow: 0 0 8px rgba(232,195,106,0.15), 0 0 20px rgba(232,195,106,0.08); }
+  50%      { box-shadow: 0 0 14px rgba(232,195,106,0.4), 0 0 36px rgba(232,195,106,0.18); }
+}
+
+/* ── Enhanced Confetti ── */
+@keyframes confettiWobbleX {
+  0%   { transform: translateX(0); }
+  25%  { transform: translateX(25px); }
+  50%  { transform: translateX(-15px); }
+  75%  { transform: translateX(20px); }
+  100% { transform: translateX(-10px); }
+}
+@keyframes confettiSpiral {
+  0%   { transform: translateX(0) translateY(0) rotate(0deg) scale(1); opacity: 1; }
+  25%  { transform: translateX(40px) translateY(30vh) rotate(180deg) scale(0.9); }
+  50%  { transform: translateX(-20px) translateY(60vh) rotate(360deg) scale(0.7); }
+  75%  { transform: translateX(30px) translateY(90vh) rotate(540deg) scale(0.5); }
+  100% { transform: translateX(-10px) translateY(120vh) rotate(720deg) scale(0.3); opacity: 0; }
+}
+
+/* ── Animated Weather Icons ── */
+@keyframes weatherRainDrop {
+  0%   { transform: translateY(-4px); opacity: 0; }
+  20%  { opacity: 1; }
+  100% { transform: translateY(18px); opacity: 0; }
+}
+@keyframes weatherCloudDrift {
+  0%, 100% { transform: translateX(0); }
+  50%      { transform: translateX(4px); }
+}
+@keyframes weatherSunPulse {
+  0%, 100% { transform: scale(1); opacity: 0.9; }
+  50%      { transform: scale(1.1); opacity: 1; }
+}
+@keyframes weatherSunRays {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+@keyframes weatherSnowFall {
+  0%   { transform: translateY(-4px) translateX(0); opacity: 0; }
+  20%  { opacity: 0.9; }
+  50%  { transform: translateY(8px) translateX(3px); }
+  100% { transform: translateY(18px) translateX(-2px); opacity: 0; }
+}
+
+/* ── Dice Shadow Physics ── */
+@keyframes diceShadowBreathe {
+  0%, 100% { transform: translateX(-50%) scaleX(1) scaleY(1); opacity: 0.5; }
+  50%      { transform: translateX(-50%) scaleX(1.06) scaleY(1.06); opacity: 0.35; }
+}
+
+/* ── Onboarding ── */
+@keyframes onboardSlideIn {
+  from { opacity: 0; transform: translateX(30px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes onboardSlideOut {
+  from { opacity: 1; transform: translateX(0); }
+  to   { opacity: 0; transform: translateX(-30px); }
+}
+@keyframes onboardDiceBounce {
+  0%, 100% { transform: rotate(-10deg); }
+  50%      { transform: rotate(10deg); }
+}
+@keyframes onboardFilterPop {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.1); }
+}
+@keyframes onboardLockClick {
+  0%, 70%  { transform: scale(1); }
+  85%      { transform: scale(0.92); }
+  100%     { transform: scale(1); }
+}
+
+/* ── Alt Results Scroll ── */
+.alt-scroll::-webkit-scrollbar { display: none; }
+.alt-scroll { -ms-overflow-style: none; scrollbar-width: none; }
 
 /* ── Seasonal Skyline Tint ── */
 .skyline-horizon-glow.season-spring {

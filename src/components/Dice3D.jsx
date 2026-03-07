@@ -54,7 +54,18 @@ export default function Dice3D({ value, rolling, size }) {
 
   return (
     <div role="img" aria-label={`Dice showing ${value || 1}`} style={{ width: s, height: s, position: 'relative' }}>
-      <div style={{ position: 'absolute', bottom: '-6px', left: '50%', transform: 'translateX(-50%)', width: s * 0.75, height: '10px', background: 'radial-gradient(ellipse, rgba(232,195,106,0.5) 0%, transparent 70%)', borderRadius: '50%', opacity: phase === 'idle' ? 1 : 0, transition: 'opacity 0.5s' }} />
+      <div style={{
+        position: 'absolute', bottom: '-6px', left: '50%',
+        width: phase === 'rolling' ? s * 1.2 : s * 0.75,
+        height: phase === 'rolling' ? '6px' : '10px',
+        background: 'radial-gradient(ellipse, rgba(232,195,106,0.5) 0%, transparent 70%)',
+        borderRadius: '50%',
+        opacity: phase === 'rolling' ? 0.15 : phase === 'settling' ? 0.7 : 1,
+        filter: phase === 'rolling' ? 'blur(4px)' : phase === 'settling' ? 'blur(1px)' : 'blur(0px)',
+        transition: phase === 'settling' ? 'all 0.3s cubic-bezier(0.34,1.56,0.64,1)' : 'all 0.5s ease',
+        animation: phase === 'idle' ? 'diceShadowBreathe 3s ease-in-out infinite' : 'none',
+        transform: 'translateX(-50%)',
+      }} />
       <div style={{ width: s, height: s, animation: floatAnim, transform: floatTransform, transition: phase !== 'rolling' ? 'transform 0.35s ease-out' : undefined }}>
         <div style={{ width: s, height: s, perspective: s * 4 }}>
           <div style={{ width: s, height: s, position: 'relative', transformStyle: 'preserve-3d', animation: cubeAnim, transform: cubeTransform }}>

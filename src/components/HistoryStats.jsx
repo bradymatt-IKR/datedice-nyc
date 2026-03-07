@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { P, sans, serif, NEIGHBORHOODS, BOROUGH_COLORS } from '../data/constants.js';
 
 const PRICE_MAP = { "Free": 0, "$": 25, "$$": 75, "$$$": 175, "$$$$": 350, "Under $50": 25, "$50-150": 100, "$50–150": 100, "$150-300": 225, "$150–300": 225, "Splurge": 400 };
@@ -22,18 +22,29 @@ function areaToBorough(area) {
   return null;
 }
 
-// ── Horizontal Bar Chart ──
-function CuisineChart({ data }) {
+// ── Horizontal Bar Chart (animated) ──
+function CuisineChart({ data, animDelay }) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setMounted(true), animDelay || 50);
+    return () => clearTimeout(t);
+  }, [animDelay]);
+
   if (!data.length) return null;
   const max = Math.max(...data.map(d => d.count));
   return (
     <div>
       <h4 style={{ fontSize: "13px", color: P.gold, fontFamily: sans, margin: "0 0 12px", fontWeight: "600" }}>🍽 Cuisines Explored</h4>
-      {data.slice(0, 8).map(d => (
+      {data.slice(0, 8).map((d, i) => (
         <div key={d.label} style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "7px" }}>
           <span style={{ width: "72px", fontSize: "11px", color: P.textDim, fontFamily: sans, textAlign: "right", flexShrink: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.label}</span>
           <div style={{ flex: 1, height: "14px", background: "rgba(255,255,255,0.04)", borderRadius: "7px", overflow: "hidden" }}>
-            <div style={{ width: (d.count / max * 100) + "%", height: "100%", background: P.grad, borderRadius: "7px", transition: "width 0.6s ease", minWidth: "8px" }} />
+            <div style={{
+              width: mounted ? (d.count / max * 100) + "%" : "0%",
+              height: "100%", background: P.grad, borderRadius: "7px",
+              transition: `width 0.6s cubic-bezier(0.4,0,0.2,1) ${i * 0.08}s`,
+              minWidth: mounted ? "8px" : "0px",
+            }} />
           </div>
           <span style={{ width: "18px", fontSize: "11px", color: P.gold, fontFamily: sans, textAlign: "right" }}>{d.count}</span>
         </div>
@@ -42,8 +53,14 @@ function CuisineChart({ data }) {
   );
 }
 
-// ── Donut Chart ──
-function BoroughDonut({ data, total }) {
+// ── Donut Chart (animated) ──
+function BoroughDonut({ data, total, animDelay }) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setMounted(true), animDelay || 50);
+    return () => clearTimeout(t);
+  }, [animDelay]);
+
   if (!data.length) return null;
   const r = 44, cx = 60, cy = 60;
   const circumference = 2 * Math.PI * r;
@@ -54,15 +71,16 @@ function BoroughDonut({ data, total }) {
       <h4 style={{ fontSize: "13px", color: P.gold, fontFamily: sans, margin: "0 0 12px", fontWeight: "600" }}>📍 Boroughs Covered</h4>
       <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
         <svg viewBox="0 0 120 120" width="110" height="110" style={{ flexShrink: 0 }}>
-          {data.map(d => {
+          {data.map((d, i) => {
             const length = (d.count / total) * circumference;
             const seg = (
               <circle key={d.borough} cx={cx} cy={cy} r={r}
                 fill="none" stroke={d.color} strokeWidth="14"
                 strokeDasharray={length + " " + (circumference - length)}
-                strokeDashoffset={-offset}
+                strokeDashoffset={mounted ? -offset : circumference}
                 transform={"rotate(-90 " + cx + " " + cy + ")"}
                 strokeLinecap="round"
+                style={{ transition: `stroke-dashoffset 0.8s cubic-bezier(0.4,0,0.2,1) ${0.3 + i * 0.15}s` }}
               />
             );
             offset += length;
@@ -84,8 +102,14 @@ function BoroughDonut({ data, total }) {
   );
 }
 
-// ── Sparkline ──
-function SpendingSparkline({ data }) {
+// ── Sparkline (animated draw) ──
+function SpendingSparkline({ data, animDelay }) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setMounted(true), animDelay || 50);
+    return () => clearTimeout(t);
+  }, [animDelay]);
+
   if (data.length < 2) return null;
   const maxVal = Math.max(...data.map(d => d.val), 1);
   const w = 260, h = 60, pad = 4;
@@ -94,6 +118,20 @@ function SpendingSparkline({ data }) {
     const y = h - pad - ((d.val / maxVal) * (h - pad * 2));
     return x + "," + y;
   }).join(" ");
+
+  // Calculate approximate path length for stroke-dasharray animation
+  const approxLength = data.reduce((sum, d, i) => {
+    if (i === 0) return 0;
+    const x1 = pad + ((i - 1) / (data.length - 1)) * (w - pad * 2);
+    const y1 = h - pad - ((data[i - 1].val / maxVal) * (h - pad * 2));
+    const x2 = pad + (i / (data.length - 1)) * (w - pad * 2);
+    const y2 = h - pad - ((d.val / maxVal) * (h - pad * 2));
+    return sum + Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
+  }, 0);
+
+  const lastPt = data[data.length - 1];
+  const lx = pad + ((data.length - 1) / (data.length - 1)) * (w - pad * 2);
+  const ly = h - pad - ((lastPt.val / maxVal) * (h - pad * 2));
 
   return (
     <div>
@@ -105,23 +143,21 @@ function SpendingSparkline({ data }) {
             <stop offset="100%" stopColor="rgba(232,195,106,0)" />
           </linearGradient>
         </defs>
-        {/* area fill */}
         <polygon
           points={pad + "," + (h - pad) + " " + points + " " + (w - pad) + "," + (h - pad)}
           fill="url(#sparkGrad)"
+          style={{ opacity: mounted ? 1 : 0, transition: 'opacity 1s ease 0.6s' }}
         />
-        {/* line */}
         <polyline
           points={points}
           fill="none" stroke={P.gold} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+          strokeDasharray={approxLength}
+          strokeDashoffset={mounted ? 0 : approxLength}
+          style={{ transition: `stroke-dashoffset 1s cubic-bezier(0.4,0,0.2,1) 0.4s` }}
         />
-        {/* dots at ends */}
-        {data.length > 0 && (() => {
-          const last = data[data.length - 1];
-          const lx = pad + ((data.length - 1) / (data.length - 1)) * (w - pad * 2);
-          const ly = h - pad - ((last.val / maxVal) * (h - pad * 2));
-          return <circle cx={lx} cy={ly} r="3" fill={P.gold} />;
-        })()}
+        <circle cx={lx} cy={ly} r="3" fill={P.gold}
+          style={{ opacity: mounted ? 1 : 0, transition: 'opacity 0.3s ease 1.2s' }}
+        />
       </svg>
       <div style={{ display: "flex", justifyContent: "space-between", fontSize: "10px", color: P.textDim, fontFamily: sans, marginTop: "4px" }}>
         <span>Oldest</span>
@@ -135,7 +171,6 @@ export default function HistoryStats({ history }) {
   const [open, setOpen] = useState(false);
 
   const { cuisineData, boroughData, boroughTotal, spendingData } = useMemo(() => {
-    // Cuisine distribution
     const cuisineCounts = {};
     history.forEach(h => {
       if (h.cuisine && h.cuisine !== "type") {
@@ -147,7 +182,6 @@ export default function HistoryStats({ history }) {
       .map(([label, count]) => ({ label, count }))
       .sort((a, b) => b.count - a.count);
 
-    // Borough distribution
     const boroughCounts = {};
     history.forEach(h => {
       const b = areaToBorough(h.area);
@@ -158,7 +192,6 @@ export default function HistoryStats({ history }) {
       .sort((a, b) => b.count - a.count);
     const boroughTotal = boroughData.reduce((s, d) => s + d.count, 0);
 
-    // Spending sparkline (chronological, oldest first)
     const spendingData = history
       .filter(h => h.priceRange && PRICE_MAP[h.priceRange] !== undefined)
       .reverse()
@@ -194,9 +227,9 @@ export default function HistoryStats({ history }) {
           display: "flex", flexDirection: "column", gap: "24px",
           animation: "tabFadeIn 0.3s ease both",
         }}>
-          {cuisineData.length > 0 && <CuisineChart data={cuisineData} />}
-          {boroughData.length > 0 && <BoroughDonut data={boroughData} total={boroughTotal} />}
-          {spendingData.length >= 2 && <SpendingSparkline data={spendingData} />}
+          {cuisineData.length > 0 && <CuisineChart data={cuisineData} animDelay={50} />}
+          {boroughData.length > 0 && <BoroughDonut data={boroughData} total={boroughTotal} animDelay={300} />}
+          {spendingData.length >= 2 && <SpendingSparkline data={spendingData} animDelay={600} />}
         </div>
       )}
     </div>
