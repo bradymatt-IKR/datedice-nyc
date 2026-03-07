@@ -195,10 +195,13 @@ export default function App() {
     try {
       res = await fetchSuggestionStream(type, currentFilters, currentUsed);
       if (!res) {
+        // Wait before fallback so rate-limit window has time to clear
+        await new Promise((r) => setTimeout(r, 2000));
+        if (rollCount.current !== myRoll) return;
         res = await fetchSuggestion(type, currentFilters, currentUsed);
       }
       if (!res) {
-        await new Promise((r) => setTimeout(r, 1000));
+        await new Promise((r) => setTimeout(r, 3000));
         if (rollCount.current !== myRoll) return;
         res = await fetchSuggestion(type, currentFilters, currentUsed);
       }

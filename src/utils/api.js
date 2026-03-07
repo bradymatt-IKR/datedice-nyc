@@ -67,7 +67,13 @@ export async function fetchSuggestionStream(type, filters, usedNames, onText) {
     });
 
     if (!resp.ok) {
-      console.error("Stream API", resp.status);
+      const errBody = await resp.text().catch(() => "");
+      console.error("Stream API", resp.status, errBody.slice(0, 200));
+      // On rate-limit (429/529), wait before returning so doRoll's fallback
+      // doesn't immediately pile into the same rate-limit window
+      if (resp.status === 429 || resp.status === 529) {
+        await new Promise(r => setTimeout(r, 3000));
+      }
       return null;
     }
 
