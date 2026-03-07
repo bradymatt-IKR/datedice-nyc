@@ -63,6 +63,7 @@ export default function App() {
   const filtersRef = useRef(filters);
   const usedNamesRef = useRef(usedNames);
   const loadingInterval = useRef(null);
+  const toastTimer = useRef(null);
 
   useEffect(() => { filtersRef.current = filters; }, [filters]);
   useEffect(() => { usedNamesRef.current = usedNames; }, [usedNames]);
@@ -164,7 +165,11 @@ export default function App() {
     return () => { if (loadingInterval.current) clearInterval(loadingInterval.current); };
   }, [rolling]);
 
-  const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(null), 2500); };
+  const showToast = (msg) => {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    setToast(msg);
+    toastTimer.current = setTimeout(() => setToast(null), 2500);
+  };
 
   const doRoll = useCallback(async () => {
     rollCount.current += 1;
@@ -528,7 +533,7 @@ export default function App() {
                         WebkitOverflowScrolling: "touch", paddingBottom: "6px",
                       }}>
                         {altResults.map((alt, i) => (
-                          <div key={i} onClick={() => { setResult(alt); setLocked(false); }} role="button" tabIndex={0}
+                          <div key={alt.name + '-' + i} onClick={() => { setResult(alt); setLocked(false); }} role="button" tabIndex={0}
                             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setResult(alt); setLocked(false); } }}
                             aria-label={`Switch to ${alt.name}`}
                             style={{

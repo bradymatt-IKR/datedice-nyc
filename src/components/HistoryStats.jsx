@@ -1,5 +1,5 @@
-import { useState, useMemo, useEffect, useRef } from 'react';
-import { P, sans, serif, NEIGHBORHOODS, BOROUGH_COLORS } from '../data/constants.js';
+import { useState, useMemo, useEffect } from 'react';
+import { P, sans, NEIGHBORHOODS, BOROUGH_COLORS } from '../data/constants.js';
 
 const PRICE_MAP = { "Free": 0, "$": 25, "$$": 75, "$$$": 175, "$$$$": 350, "Under $50": 25, "$50-150": 100, "$50–150": 100, "$150-300": 225, "$150–300": 225, "Splurge": 400 };
 

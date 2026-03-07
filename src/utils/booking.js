@@ -1,9 +1,4 @@
-// Blocked spam/SEO/redirect domains (shared pattern with DiscoverScreen)
-const BLOCKED_DOMAINS = [
-  "searchhounds.com", "addoor.co", "clicktracker.com", "trovit.com",
-  "startpage.com", "searchencrypt.com", "duckduckgo.com", "google.com",
-  "bing.com", "yahoo.com", "baidu.com", "yandex.com",
-];
+import { BLOCKED_DOMAINS } from './blockedDomains.js';
 
 /** Validate a booking URL. Returns clean URL or empty string. */
 function validateBookingUrl(raw) {

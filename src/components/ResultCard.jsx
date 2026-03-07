@@ -19,7 +19,7 @@ export default function ResultCard({ result, onReroll, onLockIn, onShare, onTwea
 
       {booking && (
         <div style={{ marginBottom: "8px" }}>
-          <button onClick={() => window.open(booking.url, "_blank")} aria-label={booking.label + " for " + result.name} style={{
+          <button onClick={() => window.open(booking.url, "_blank", "noopener,noreferrer")} aria-label={booking.label + " for " + result.name} style={{
             width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
             background: "linear-gradient(135deg, rgba(110,207,148,0.15), rgba(106,175,232,0.15))",
             border: "1px solid rgba(110,207,148,0.35)", borderRadius: "14px", padding: "14px 20px",
@@ -30,7 +30,7 @@ export default function ResultCard({ result, onReroll, onLockIn, onShare, onTwea
             {booking.isFallback && <span style={{ fontSize: "11px", opacity: 0.6, fontWeight: "400" }}>(search)</span>}
           </button>
           {!booking.isFallback && (
-            <button onClick={() => window.open("https://www.google.com/search?q=" + encodeURIComponent(result.name + " " + (result.address || "NYC") + " book reserve tickets"), "_blank")} style={{
+            <button onClick={() => window.open("https://www.google.com/search?q=" + encodeURIComponent(result.name + " " + (result.address || "NYC") + " book reserve tickets"), "_blank", "noopener,noreferrer")} style={{
               width: "100%", background: "none", border: "none", padding: "6px 0 0",
               color: P.textDim, fontSize: "11px", fontFamily: sans, cursor: "pointer", opacity: 0.5,
               transition: "opacity 0.2s",
@@ -49,18 +49,18 @@ export default function ResultCard({ result, onReroll, onLockIn, onShare, onTwea
         <Btn small onClick={onShare} style={{ flex: "1 1 auto", fontSize: "12px" }} aria-label="Share this suggestion">📤 Share</Btn>
         <Btn small onClick={() => {
           const dest = encodeURIComponent((result.address || result.name) + ", New York, NY");
-          window.open("https://www.google.com/maps/dir/?api=1&destination=" + dest + "&travelmode=walking", "_blank");
+          window.open("https://www.google.com/maps/dir/?api=1&destination=" + dest + "&travelmode=walking", "_blank", "noopener,noreferrer");
         }} style={{ flex: "1 1 auto", fontSize: "12px" }} aria-label="Get walking directions">🚶 Directions</Btn>
-        <Btn small onClick={() => window.open("https://www.google.com/search?q=" + encodeURIComponent(result.name + (result.address ? " " + result.address : " NYC")), "_blank")} style={{ flex: "1 1 auto", fontSize: "12px" }} aria-label="Look up on Google">🔎 Look Up</Btn>
+        <Btn small onClick={() => window.open("https://www.google.com/search?q=" + encodeURIComponent(result.name + (result.address ? " " + result.address : " NYC")), "_blank", "noopener,noreferrer")} style={{ flex: "1 1 auto", fontSize: "12px" }} aria-label="Look up on Google">🔎 Look Up</Btn>
         <Btn small onClick={() => {
           const now = new Date(), s = new Date(now), e = new Date(now);
           s.setHours(19, 0, 0, 0); e.setHours(22, 0, 0, 0);
           const fmt = (d) => d.toISOString().replace(/[-:]/g, "").replace(/\.\d+/, "");
-          window.open("https://calendar.google.com/calendar/render?action=TEMPLATE&text=" + encodeURIComponent("Date Night: " + result.name) + "&dates=" + fmt(s) + "/" + fmt(e) + "&details=" + encodeURIComponent(result.desc + (result.tip ? "\n\nTip: " + result.tip : "")) + "&location=" + encodeURIComponent((result.address || result.area) + ", New York, NY"), "_blank");
+          window.open("https://calendar.google.com/calendar/render?action=TEMPLATE&text=" + encodeURIComponent("Date Night: " + result.name) + "&dates=" + fmt(s) + "/" + fmt(e) + "&details=" + encodeURIComponent(result.desc + (result.tip ? "\n\nTip: " + result.tip : "")) + "&location=" + encodeURIComponent((result.address || result.area) + ", New York, NY"), "_blank", "noopener,noreferrer");
         }} style={{ flex: "1 1 auto", fontSize: "12px" }} aria-label="Add to Google Calendar">📅 Google Cal</Btn>
       </div>
       <button onClick={onTweakFilters} aria-label="Change filters and roll again" style={{ width: "100%", background: "rgba(255,255,255,0.03)", border: "1px solid " + P.border, borderRadius: "12px", padding: "10px", color: P.textDim, fontSize: "13px", fontFamily: sans, cursor: "pointer", transition: "all 0.2s", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}>
-        ← Change Filters &amp; Roll Again
+        ← Change Filters & Roll Again
       </button>
       {onLoadAlt && (
         <button onClick={onLoadAlt} disabled={isRolling || altsLoading} aria-label={altsLoading ? "Finding another option" : "Load another option"} style={{

@@ -24,11 +24,9 @@ const STEPS = [
 
 export default function Onboarding({ onComplete }) {
   const [step, setStep] = useState(0);
-  const [dir, setDir] = useState(1); // 1 = forward, -1 = back
 
   const next = () => {
     if (step < STEPS.length - 1) {
-      setDir(1);
       setStep(step + 1);
     } else {
       onComplete();

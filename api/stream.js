@@ -1,37 +1,10 @@
-const ALLOWED_MODELS = new Set([
-  'claude-sonnet-4-6',
-  'claude-sonnet-4-5-20241022',
-  'claude-haiku-4-5-20251001',
-]);
-
-function validateBody(body) {
-  if (!body || typeof body !== 'object') return 'Request body must be a JSON object';
-  if (typeof body.model !== 'string' || !ALLOWED_MODELS.has(body.model)) return 'Invalid model';
-  if (typeof body.max_tokens !== 'number' || body.max_tokens < 1 || body.max_tokens > 2000) return 'max_tokens must be 1-2000';
-  if (!Array.isArray(body.messages) || body.messages.length === 0) return 'messages must be a non-empty array';
-  for (const msg of body.messages) {
-    if (!msg || typeof msg.role !== 'string' || !msg.content) return 'Each message must have role and content';
-    if (!['user', 'assistant'].includes(msg.role)) return 'Invalid message role';
-  }
-  if (body.tools && !Array.isArray(body.tools)) return 'tools must be an array';
-  return null;
-}
-
-function sanitizeBody(body) {
-  const clean = {
-    model: body.model,
-    max_tokens: Math.min(body.max_tokens, 2000),
-    messages: body.messages.map((m) => ({ role: m.role, content: m.content })),
-    stream: true,
-  };
-  if (body.tools) clean.tools = body.tools;
-  if (body.system && typeof body.system === 'string') clean.system = body.system;
-  return clean;
-}
+import { validateBody, sanitizeBody, getAllowedOrigin } from './_shared.js';
 
 export default async function handler(req, res) {
+  const origin = getAllowedOrigin(req);
+
   if (req.method === 'OPTIONS') {
-    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Origin', origin);
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
     return res.status(200).end();
@@ -51,7 +24,7 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: validationError });
   }
 
-  const cleanBody = sanitizeBody(req.body);
+  const cleanBody = sanitizeBody(req.body, { stream: true });
 
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -73,7 +46,7 @@ export default async function handler(req, res) {
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
-    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Origin', origin);
 
     const reader = response.body.getReader();
     const decoder = new TextDecoder();

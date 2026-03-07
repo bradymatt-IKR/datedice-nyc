@@ -3,6 +3,7 @@ import { P, sans, serif, LOADING_MESSAGES } from '../data/constants.js';
 import { API_URL, stripCites } from '../utils/api.js';
 import { formatDate, getDateRangeLabel, getSeason } from '../utils/date.js';
 import Btn from './Btn.jsx';
+import { BLOCKED_DOMAINS } from '../utils/blockedDomains.js';
 
 const TIMEFRAMES = ["tonight", "this week", "this weekend", "next week"];
 const DISCOVER_EMOJI = ["🗽", "🎭", "🎶", "🎨", "🌃", "🎪", "🎷", "🏙"];
@@ -26,13 +27,6 @@ const VARIETY_HINTS = [
   "Emphasize new openings, recently launched exhibits, and events that started in the last month.",
   "Highlight free or low-cost events, community gatherings, and hidden cultural experiences.",
   "Focus on immersive, interactive, or participatory events — not just things to watch.",
-];
-
-// Blocked spam/SEO/redirect domains that appear in web search results
-const BLOCKED_DOMAINS = [
-  "searchhounds.com", "addoor.co", "clicktracker.com", "trovit.com",
-  "startpage.com", "searchencrypt.com", "duckduckgo.com", "google.com",
-  "bing.com", "yahoo.com", "baidu.com", "yandex.com",
 ];
 
 /** Validate and clean a URL from search results. Returns clean URL or empty string. */
@@ -99,6 +93,11 @@ export default function DiscoverScreen() {
   const searchCount = useRef(0);
   const msgInterval = useRef(null);
   const abortRef = useRef(null);
+
+  // Abort in-flight fetch on unmount
+  useEffect(() => {
+    return () => { if (abortRef.current) abortRef.current.abort(); };
+  }, []);
 
   useEffect(() => {
     if (loading) {
@@ -266,14 +265,14 @@ export default function DiscoverScreen() {
           const hasUrl = ev.url && ev.url.startsWith("http");
           const openEvent = () => {
             if (hasUrl) {
-              window.open(ev.url, "_blank", "noopener");
+              window.open(ev.url, "_blank", "noopener,noreferrer");
             } else {
-              window.open("https://www.google.com/search?q=" + encodeURIComponent(ev.name + " NYC " + ev.area + " tickets"), "_blank", "noopener");
+              window.open("https://www.google.com/search?q=" + encodeURIComponent(ev.name + " NYC " + ev.area + " tickets"), "_blank", "noopener,noreferrer");
             }
           };
           return (
             <div
-              key={i}
+              key={ev.name + '-' + i}
               onClick={openEvent}
               role="link"
               tabIndex={0}

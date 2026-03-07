@@ -17,30 +17,6 @@ export function cleanResult(obj) {
   return out;
 }
 
-// ── Cache helpers ──
-function getCacheKey(type, filters, usedNames) {
-  return JSON.stringify({ type, filters, used: (usedNames || []).slice(-10) });
-}
-
-const responseCache = new Map();
-const CACHE_TTL = 30 * 60 * 1000; // 30 minutes
-
-function getCached(key) {
-  const entry = responseCache.get(key);
-  if (entry && Date.now() - entry.ts < CACHE_TTL) return entry.data;
-  if (entry) responseCache.delete(key);
-  return null;
-}
-
-function setCache(key, data) {
-  responseCache.set(key, { data, ts: Date.now() });
-  // Keep cache from growing unbounded
-  if (responseCache.size > 50) {
-    const oldest = responseCache.keys().next().value;
-    responseCache.delete(oldest);
-  }
-}
-
 function buildPrompt(type, filters, usedNames) {
   const { timeOfDay, weather, vibe, budget, duration, neighborhood, cuisine, activityType } = filters;
   const season = getSeason();
@@ -162,17 +138,3 @@ export async function fetchSuggestion(type, filters, usedNames) {
   }
 }
 
-export async function fetchMultiple(type, filters, count, usedNames) {
-  const promises = [];
-  for (let i = 0; i < count; i++) promises.push(fetchSuggestion(type, filters, usedNames));
-  const settled = await Promise.allSettled(promises);
-  const results = [];
-  const seen = new Set((usedNames || []).map((n) => n.toLowerCase()));
-  settled.forEach((s) => {
-    if (s.status === "fulfilled" && s.value && s.value.name) {
-      const key = s.value.name.toLowerCase();
-      if (!seen.has(key)) { seen.add(key); results.push(s.value); }
-    }
-  });
-  return results;
-}

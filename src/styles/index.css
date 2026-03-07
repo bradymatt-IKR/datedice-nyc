@@ -60,12 +60,6 @@ body {
   100% { transform: translateY(120vh) rotate(720deg) scale(0.3); opacity: 0; }
 }
 
-@keyframes confettiBurst {
-  0%   { transform: translate(0, 0) scale(0); opacity: 0; }
-  20%  { opacity: 1; }
-  100% { opacity: 0; }
-}
-
 /* ── Tab Crossfade ── */
 @keyframes tabFadeIn {
   from { opacity: 0; transform: translateY(8px); }
@@ -238,12 +232,12 @@ body {
   50%      { transform: translateX(4px); }
 }
 @keyframes weatherSunPulse {
-  0%, 100% { transform: scale(1); opacity: 0.9; }
-  50%      { transform: scale(1.1); opacity: 1; }
+  0%, 100% { transform: translate(-50%,-50%) scale(1); opacity: 0.9; }
+  50%      { transform: translate(-50%,-50%) scale(1.1); opacity: 1; }
 }
 @keyframes weatherSunRays {
-  from { transform: rotate(0deg); }
-  to   { transform: rotate(360deg); }
+  from { transform: translate(-50%,-50%) rotate(0deg); }
+  to   { transform: translate(-50%,-50%) rotate(360deg); }
 }
 @keyframes weatherSnowFall {
   0%   { transform: translateY(-4px) translateX(0); opacity: 0; }
@@ -262,10 +256,6 @@ body {
 @keyframes onboardSlideIn {
   from { opacity: 0; transform: translateX(30px); }
   to   { opacity: 1; transform: translateX(0); }
-}
-@keyframes onboardSlideOut {
-  from { opacity: 1; transform: translateX(0); }
-  to   { opacity: 0; transform: translateX(-30px); }
 }
 @keyframes onboardDiceBounce {
   0%, 100% { transform: rotate(-10deg); }
