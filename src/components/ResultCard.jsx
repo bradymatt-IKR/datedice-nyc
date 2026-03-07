@@ -59,7 +59,7 @@ export default function ResultCard({ result, onReroll, onLockIn, onShare, onTwea
           window.open("https://calendar.google.com/calendar/render?action=TEMPLATE&text=" + encodeURIComponent("Date Night: " + result.name) + "&dates=" + fmt(s) + "/" + fmt(e) + "&details=" + encodeURIComponent(result.desc + (result.tip ? "\n\nTip: " + result.tip : "")) + "&location=" + encodeURIComponent((result.address || result.area) + ", New York, NY"), "_blank", "noopener,noreferrer");
         }} style={{ flex: "1 1 auto", fontSize: "12px" }} aria-label="Add to Google Calendar">📅 Google Cal</Btn>
       </div>
-      <button onClick={onTweakFilters} aria-label="Change filters and roll again" style={{ width: "100%", background: "rgba(255,255,255,0.03)", border: "1px solid " + P.border, borderRadius: "12px", padding: "10px", color: P.textDim, fontSize: "13px", fontFamily: sans, cursor: "pointer", transition: "all 0.2s", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}>
+      <button onClick={onTweakFilters} aria-label="Change filters and roll again" style={{ width: "100%", background: "rgba(255,255,255,0.03)", border: "1px solid " + P.border, borderRadius: "12px", padding: "10px", color: "rgba(240,236,226,0.7)", fontSize: "13px", fontFamily: sans, cursor: "pointer", transition: "all 0.2s", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}>
         ← Change Filters & Roll Again
       </button>
       {onLoadAlt && (
@@ -68,7 +68,7 @@ export default function ResultCard({ result, onReroll, onLockIn, onShare, onTwea
           background: "rgba(255,255,255,0.03)",
           border: "1px dashed rgba(255,255,255,0.1)",
           borderRadius: "12px", padding: "10px",
-          color: altsLoading ? P.gold : P.textDim,
+          color: altsLoading ? P.gold : "rgba(240,236,226,0.7)",
           fontSize: "13px", fontFamily: sans,
           cursor: altsLoading ? "wait" : "pointer",
           display: "flex", alignItems: "center", justifyContent: "center", gap: "6px",

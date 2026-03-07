@@ -236,11 +236,11 @@ export default function App() {
     else type = Math.random() > 0.45 ? "food" : "activity";
     setAltsLoading(true);
     try {
-      // Fetch 3 in parallel — dedup may discard one, so overshoot to reliably get 2
+      // Fetch 3 in parallel with variation hints so each gets a unique prompt + cache key
       const results = await Promise.all([
-        fetchSuggestion(type, currentFilters, allUsed),
-        fetchSuggestion(type, currentFilters, allUsed),
-        fetchSuggestion(type, currentFilters, allUsed),
+        fetchSuggestion(type, currentFilters, allUsed, { variation: 1 }),
+        fetchSuggestion(type, currentFilters, allUsed, { variation: 2 }),
+        fetchSuggestion(type, currentFilters, allUsed, { variation: 3 }),
       ]);
       if (rollCount.current !== thisRoll) { setAltsLoading(false); return; }
       const newAlts = [];

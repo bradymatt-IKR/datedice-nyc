@@ -6,7 +6,7 @@ const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 function getCacheKey(body) {
   const prompt = body.messages?.[0]?.content || '';
-  return body.model + ':' + prompt.slice(0, 200);
+  return body.model + ':' + prompt.slice(0, 200) + ':' + prompt.slice(-60);
 }
 
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
@@ -20,6 +20,9 @@ export default async function handler(req, res) {
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
     return res.status(200).end();
   }
+
+  // Set CORS on ALL responses (not just success) so browsers don't swallow errors
+  res.setHeader('Access-Control-Allow-Origin', origin);
 
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -42,7 +45,6 @@ export default async function handler(req, res) {
   const cacheKey = getCacheKey(cleanBody);
   const cached = responseCache.get(cacheKey);
   if (cached && Date.now() - cached.ts < CACHE_TTL) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
     res.setHeader('X-Cache', 'HIT');
     return res.status(200).json(cached.data);
   }
@@ -66,7 +68,6 @@ export default async function handler(req, res) {
       }
 
       const data = await response.json();
-      res.setHeader('Access-Control-Allow-Origin', origin);
 
       // Cache successful responses
       if (response.status === 200) {

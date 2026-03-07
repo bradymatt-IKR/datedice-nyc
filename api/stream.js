@@ -10,6 +10,9 @@ export default async function handler(req, res) {
     return res.status(200).end();
   }
 
+  // Set CORS on ALL responses (not just success) so browsers don't swallow errors
+  res.setHeader('Access-Control-Allow-Origin', origin);
+
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -46,7 +49,6 @@ export default async function handler(req, res) {
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
-    res.setHeader('Access-Control-Allow-Origin', origin);
 
     const reader = response.body.getReader();
     const decoder = new TextDecoder();

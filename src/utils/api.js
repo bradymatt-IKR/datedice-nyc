@@ -17,13 +17,14 @@ export function cleanResult(obj) {
   return out;
 }
 
-function buildPrompt(type, filters, usedNames) {
+function buildPrompt(type, filters, usedNames, variation) {
   const { timeOfDay, weather, vibe, budget, duration, neighborhood, cuisine, activityType } = filters;
   const season = getSeason();
   const today = formatDate(new Date());
   const avoidList = (usedNames || []).slice(-40).join(", ");
   const neighborhoodStr = Array.isArray(neighborhood) && neighborhood.length > 0 ? neighborhood.join(", ") : (neighborhood || "anywhere in NYC or nearby");
-  const jsonNote = "\n\nRespond with ONLY a raw JSON object — no markdown, no backticks, no extra text.";
+  const variationHint = variation ? "\nImportant: Pick a DIFFERENT and UNIQUE option — variation #" + variation + ". Do NOT repeat any previously suggested place." : "";
+  const jsonNote = "\n\nRespond with ONLY a raw JSON object — no markdown, no backticks, no extra text." + variationHint;
 
   if (type === "food") {
     const cuisineStr = cuisine || "any cuisine — surprise us";
@@ -113,8 +114,8 @@ export async function fetchSuggestionStream(type, filters, usedNames, onText) {
 }
 
 // ── Standard (non-streaming) fetch ──
-export async function fetchSuggestion(type, filters, usedNames) {
-  const prompt = buildPrompt(type, filters, usedNames);
+export async function fetchSuggestion(type, filters, usedNames, { variation } = {}) {
+  const prompt = buildPrompt(type, filters, usedNames, variation);
   try {
     const resp = await fetch(API_URL, {
       method: "POST",
