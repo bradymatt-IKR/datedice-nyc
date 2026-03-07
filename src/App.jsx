@@ -322,6 +322,48 @@ export default function App() {
     showToast(preset.emoji + " " + preset.label + " loaded!");
   };
 
+  const dealersChoice = () => {
+    const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+    const pickN = (arr, min, max) => {
+      const n = min + Math.floor(Math.random() * (max - min + 1));
+      return [...arr].sort(() => Math.random() - 0.5).slice(0, n);
+    };
+    const maybe = (prob, fn) => Math.random() < prob ? fn() : undefined;
+
+    const f = {};
+    // Category: weighted
+    const catRoll = Math.random();
+    if (catRoll < 0.4) f.category = "Food & Drink";
+    else if (catRoll < 0.7) f.category = "Activities";
+    // else leave as Surprise Me
+
+    // Always pick 1-2 vibes
+    f.vibe = pickN(FILTERS_MAIN.vibe.options, 1, 2);
+
+    // Budget: 70% chance
+    maybe(0.7, () => { f.budget = pick(FILTERS_MAIN.budget.options); });
+
+    // Duration: 40% chance
+    maybe(0.4, () => { f.duration = pick(FILTERS_MAIN.duration.options); });
+
+    // Time of day: keep auto-detected or random
+    f.timeOfDay = Math.random() > 0.4 ? getTimeOfDay() : pick(FILTERS_MAIN.timeOfDay.options);
+
+    // Weather: keep current
+    if (weather) f.weather = weather.autoFilter;
+
+    // Neighborhood: 35% chance of picking 1-2
+    maybe(0.35, () => { f.neighborhood = pickN(Object.values(NEIGHBORHOODS).flat(), 1, 2); });
+
+    // Cuisine: 30% if food-eligible
+    if (f.category !== "Activities") {
+      maybe(0.3, () => { f.cuisine = pickN(CUISINES, 1, 3); });
+    }
+
+    setFilters(f);
+    showToast(pick(["🃏 Dealer's choice!", "🎲 Fate has spoken!", "✨ The dice gods have decided!", "🎰 Let's see where this goes!"]));
+  };
+
   const timeTint = getTimeTint();
   const pageStyle = { minHeight: "100vh", background: `radial-gradient(ellipse at 20% 0%,${timeTint} 0%,transparent 50%),radial-gradient(ellipse at 80% 100%,rgba(201,125,74,0.05) 0%,transparent 50%)`, color: P.text, fontFamily: serif, position: "relative" };
 
@@ -391,8 +433,28 @@ export default function App() {
               <h2 style={{ fontSize: "26px", fontWeight: "400", margin: "0 0 4px", color: P.gold }}>Set the Scene</h2>
               <p style={{ fontSize: "13px", color: P.textDim, margin: "0 0 16px", fontFamily: sans }}>Pick what matters — skip what doesn't</p>
 
-              {/* Quick Filter Presets */}
+              {/* Quick Filter Presets + Dealer's Choice */}
               <div style={{ display: "flex", gap: "8px", marginBottom: "20px", flexWrap: "wrap" }}>
+                <button
+                  onClick={dealersChoice}
+                  style={{
+                    background: "linear-gradient(135deg, rgba(201,125,74,0.18), rgba(232,195,106,0.12))",
+                    border: "1px solid rgba(232,195,106,0.3)",
+                    borderRadius: "20px",
+                    padding: "8px 14px",
+                    fontSize: "12px",
+                    fontFamily: sans,
+                    color: P.goldBright,
+                    cursor: "pointer",
+                    transition: "all 0.2s",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "5px",
+                  }}
+                  aria-label="Randomize all filters"
+                >
+                  <span aria-hidden="true">🃏</span> Dealer's Choice
+                </button>
                 {FILTER_PRESETS.map((preset) => (
                   <button
                     key={preset.label}
