@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { P, sans, serif, NEIGHBORHOODS, CUISINES, ACTIVITY_TYPES, FILTERS_MAIN, BOROUGH_COLORS, LOADING_MESSAGES, LOADING_EMOJI, FILTER_PRESETS } from './data/constants.js';
+import { P, sans, serif, display, NEIGHBORHOODS, CUISINES, ACTIVITY_TYPES, FILTERS_MAIN, BOROUGH_COLORS, LOADING_MESSAGES, LOADING_EMOJI, FILTER_PRESETS } from './data/constants.js';
 import { formatDate, getTimeOfDay, getSeason } from './utils/date.js';
 import { WMO, classifyWeather, weatherToFilter } from './utils/weather.js';
 import { loadData, saveData } from './utils/storage.js';
@@ -301,8 +301,31 @@ export default function App() {
       <div style={pageStyle}>
         {showOnboarding && <Onboarding onComplete={() => { setShowOnboarding(false); saveData("datedice:onboarded", true); }} />}
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "100vh", padding: "40px 20px", textAlign: "center", position: "relative", overflow: "hidden" }}>
-          <div style={{ fontSize: "72px", marginBottom: "16px", filter: "drop-shadow(0 0 24px rgba(232,195,106,0.3))" }} aria-hidden="true">🎲</div>
-          <h1 style={{ fontSize: "clamp(38px, 8vw, 58px)", fontWeight: "400", letterSpacing: "0.04em", margin: "0 0 8px", background: P.grad, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>Date Dice</h1>
+          <svg width="96" height="72" viewBox="0 0 120 80" fill="none" xmlns="http://www.w3.org/2000/svg"
+               style={{ marginBottom: "16px", filter: "drop-shadow(0 0 20px rgba(232,195,106,0.35))" }}
+               aria-hidden="true">
+            <defs>
+              <linearGradient id="dice-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#e8c36a" />
+                <stop offset="100%" stopColor="#c97d4a" />
+              </linearGradient>
+            </defs>
+            <g transform="translate(28, 40) rotate(-12)">
+              <rect x="-24" y="-24" width="48" height="48" rx="8" fill="url(#dice-grad)" opacity="0.9" />
+              <circle cx="-10" cy="-10" r="3.5" fill="rgba(255,255,255,0.9)" />
+              <circle cx="0" cy="0" r="3.5" fill="rgba(255,255,255,0.9)" />
+              <circle cx="10" cy="10" r="3.5" fill="rgba(255,255,255,0.9)" />
+            </g>
+            <g transform="translate(80, 38) rotate(8)">
+              <rect x="-24" y="-24" width="48" height="48" rx="8" fill="url(#dice-grad)" />
+              <circle cx="-10" cy="-10" r="3.5" fill="rgba(255,255,255,0.9)" />
+              <circle cx="10" cy="-10" r="3.5" fill="rgba(255,255,255,0.9)" />
+              <circle cx="0" cy="0" r="3.5" fill="rgba(255,255,255,0.9)" />
+              <circle cx="-10" cy="10" r="3.5" fill="rgba(255,255,255,0.9)" />
+              <circle cx="10" cy="10" r="3.5" fill="rgba(255,255,255,0.9)" />
+            </g>
+          </svg>
+          <h1 className="title-shimmer" style={{ fontSize: "clamp(38px, 8vw, 58px)", fontWeight: "700", letterSpacing: "0.02em", margin: "0 0 8px", background: "linear-gradient(90deg, #e8c36a 0%, #c97d4a 30%, #f5d98a 50%, #c97d4a 70%, #e8c36a 100%)", backgroundSize: "200% auto", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", fontFamily: display, animation: "titleShimmer 6s ease-in-out infinite" }}>Date Dice</h1>
           <p style={{ fontSize: "14px", color: P.textDim, letterSpacing: "0.18em", textTransform: "uppercase", margin: "0 0 8px", fontFamily: sans }}>New York City Edition</p>
           <p style={{ fontSize: "13px", color: P.accent, margin: "0 0 8px", fontFamily: sans }}>📅 {formatDate(new Date())} · {getSeason()}</p>
           {weather && <p style={{ fontSize: "13px", color: P.textDim, margin: "0 0 6px", fontFamily: sans }}>{weather.wmoIcon} {weather.tempF}°F · {weather.classification} in Brooklyn</p>}

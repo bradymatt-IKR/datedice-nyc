@@ -17,6 +17,7 @@ export const P = {
 
 export const sans = "'Helvetica Neue','Segoe UI',sans-serif";
 export const serif = "'Georgia','Palatino Linotype',serif";
+export const display = "'Playfair Display','Georgia','Palatino Linotype',serif";
 
 // ── Neighborhoods ──
 export const NEIGHBORHOODS = {
