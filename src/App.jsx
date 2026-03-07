@@ -236,11 +236,10 @@ export default function App() {
     else type = Math.random() > 0.45 ? "food" : "activity";
     setAltsLoading(true);
     try {
-      // Fetch 3 in parallel with variation hints so each gets a unique prompt + cache key
+      // Use streaming endpoint (same as doRoll) — more reliable than non-streaming
       const results = await Promise.all([
-        fetchSuggestion(type, currentFilters, allUsed, { variation: 1 }),
-        fetchSuggestion(type, currentFilters, allUsed, { variation: 2 }),
-        fetchSuggestion(type, currentFilters, allUsed, { variation: 3 }),
+        fetchSuggestionStream(type, currentFilters, allUsed).catch(() => null),
+        fetchSuggestionStream(type, currentFilters, allUsed).catch(() => null),
       ]);
       if (rollCount.current !== thisRoll) { setAltsLoading(false); return; }
       const newAlts = [];
@@ -257,6 +256,8 @@ export default function App() {
         setUsedNames(newNames);
         saveData("datedice:used", newNames.slice(-200));
         setAltResults((prev) => prev.concat(newAlts));
+      } else {
+        showToast("Couldn't find more options — try tweaking your filters");
       }
     } catch (e) { if (e && e.name !== "AbortError") console.error("loadAlt:", e); }
     setAltsLoading(false);

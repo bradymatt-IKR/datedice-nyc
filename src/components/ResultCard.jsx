@@ -63,7 +63,7 @@ export default function ResultCard({ result, onReroll, onLockIn, onShare, onTwea
         ← Change Filters & Roll Again
       </button>
       {onLoadAlt && (
-        <button onClick={onLoadAlt} disabled={isRolling || altsLoading} aria-label={altsLoading ? "Finding another option" : "Load another option"} style={{
+        <button onClick={onLoadAlt} disabled={isRolling || altsLoading} aria-label={altsLoading ? "Finding more options" : "Show me something else"} style={{
           width: "100%", marginTop: "8px",
           background: "rgba(255,255,255,0.03)",
           border: "1px dashed rgba(255,255,255,0.1)",
@@ -75,8 +75,8 @@ export default function ResultCard({ result, onReroll, onLockIn, onShare, onTwea
           transition: "all 0.2s",
         }}>
           {altsLoading
-            ? <span><span style={{ animation: "spin 1s linear infinite", display: "inline-block", marginRight: "6px" }}>⟳</span> Finding another option...</span>
-            : <span>✦ Load another option</span>}
+            ? <span><span style={{ animation: "spin 1s linear infinite", display: "inline-block", marginRight: "6px" }}>⟳</span> Finding more options...</span>
+            : <span>✦ What else you got?</span>}
         </button>
       )}
     </div>
