@@ -1,3 +1,13 @@
+/* ── Sky Phase Custom Properties ── */
+:root {
+  --sky-top: rgba(12,12,24,0);
+  --sky-mid: rgba(12,12,24,0);
+  --sky-horizon: rgba(12,12,24,0);
+  --star-opacity: 0.7;
+  --shooting-star-opacity: 1;
+  --window-opacity: 1;
+}
+
 * {
   box-sizing: border-box;
   -webkit-tap-highlight-color: transparent;
@@ -298,11 +308,50 @@ body {
   -webkit-mask-image: linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.3) 35%, rgba(0,0,0,1) 70%);
   mask-image: linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.3) 35%, rgba(0,0,0,1) 70%);
 }
-.star-field-svg { position: absolute; top: 0; left: 0; width: 100%; height: 70%; opacity: 0.7; }
+.star-field-svg {
+  position: absolute; top: 0; left: 0; width: 100%; height: 70%;
+  opacity: var(--star-opacity, 0.7);
+  transition: opacity 120s ease;
+}
+.shooting-star {
+  opacity: 0; /* base — animation overrides when visible */
+}
+.skyline-stage .shooting-star {
+  --ss-phase-opacity: var(--shooting-star-opacity, 1);
+}
+.skyline-stage[data-sky-phase="day"] .shooting-star,
+.skyline-stage[data-sky-phase="sunrise"] .shooting-star {
+  display: none !important;
+}
+.window-lights {
+  opacity: var(--window-opacity, 1);
+  transition: opacity 120s ease;
+}
+
+/* Sky gradient overlay — sits behind everything, colored by phase */
+.sky-gradient-overlay {
+  position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+  background: linear-gradient(
+    to bottom,
+    var(--sky-top, transparent) 0%,
+    var(--sky-mid, transparent) 50%,
+    var(--sky-horizon, transparent) 100%
+  );
+  transition: background 120s ease;
+  pointer-events: none;
+  z-index: 0;
+}
+
 .skyline-horizon-glow {
   position: absolute; bottom: 0; left: 0; right: 0; height: 250px;
-  background: linear-gradient(to top, rgba(201,125,74,0.15) 0%, rgba(232,195,106,0.08) 25%, rgba(106,175,232,0.03) 50%, transparent 70%);
+  background: linear-gradient(to top,
+    var(--glow-color-1, rgba(201,125,74,0.15)) 0%,
+    var(--glow-color-2, rgba(232,195,106,0.08)) 25%,
+    rgba(106,175,232,0.03) 50%,
+    transparent 70%
+  );
   pointer-events: none;
+  transition: background 120s ease;
 }
 
 /* ── Desktop Layout ── */

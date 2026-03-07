@@ -27,6 +27,10 @@ const VARIETY_HINTS = [
   "Emphasize new openings, recently launched exhibits, and events that started in the last month.",
   "Highlight free or low-cost events, community gatherings, and hidden cultural experiences.",
   "Focus on immersive, interactive, or participatory events — not just things to watch.",
+  "Search for events from independent venues, small galleries, community spaces, and local cultural orgs.",
+  "Look for events at unconventional venues — rooftops, warehouses, parks, bookstores, bars with back rooms.",
+  "Prioritize events from neighborhood blogs, local Instagram accounts, and community boards over major listing sites.",
+  "Focus on NYC-specific seasonal events, block parties, street fairs, and cultural festivals happening right now.",
 ];
 
 /** Validate and clean a URL from search results. Returns clean URL or empty string. */
@@ -91,6 +95,7 @@ export default function DiscoverScreen() {
   const [loadingMsg, setLoadingMsg] = useState(LOADING_MESSAGES[0]);
   const [loadingEmoji, setLoadingEmoji] = useState(DISCOVER_EMOJI[0]);
   const searchCount = useRef(0);
+  const shownNames = useRef([]);
   const msgInterval = useRef(null);
   const abortRef = useRef(null);
 
@@ -135,8 +140,13 @@ export default function DiscoverScreen() {
       ? "Focus specifically on " + catInfo.label.toLowerCase() + " events. All 6 results should be " + catInfo.label.toLowerCase() + " or closely related."
       : "Include a diverse mix: theater/shows, museum exhibits, live music, food events, comedy, and seasonal events for " + getSeason() + ".";
 
+    // Build avoid list from previously shown events
+    const avoidClause = shownNames.current.length > 0
+      ? "\n\nDo NOT suggest any of these previously shown events: " + shownNames.current.slice(-30).join(", ") + "."
+      : "";
+
     // Timestamp makes each request unique to prevent server-side caching
-    const prompt = "Today is " + formatDate(new Date()) + " (search ID: " + Date.now() + "). Search the web for NYC events and list exactly 6 specific events, shows, exhibits, performances, or experiences happening " + query + " (" + getDateRangeLabel(query) + "). " + catClause + " " + varietyHint + " You MUST return exactly 6 items. Do NOT repeat popular staples like Sleep No More, MoMA general admission, or long-running Broadway shows unless they have something special happening this specific timeframe. For each event, include the url field with the best matching webpage from your search results (event page, ticket page, or venue page). Use empty string ONLY if no relevant page appeared in results. Respond ONLY with a raw JSON array, no markdown, no backticks: [{\"name\":\"...\",\"desc\":\"One sentence description\",\"area\":\"Neighborhood\",\"cat\":\"Category\",\"cost\":\"Price or Free\",\"emoji\":\"...\",\"url\":\"https://... or empty string\"}]";
+    const prompt = "Today is " + formatDate(new Date()) + " (search ID: " + Date.now() + "). Search the web for NYC events happening " + query + " (" + getDateRangeLabel(query) + "). " + catClause + "\n\n" + varietyHint + "\n\nSEARCH STRATEGY: Do NOT just search \"NYC events\" — that only surfaces SEO-heavy aggregators. Instead, search for specific neighborhoods and venue types, e.g. \"Bushwick warehouse party\", \"East Village comedy tonight\", \"Williamsburg gallery opening\", \"Harlem jazz this week\". Mix broad and specific searches to find what a real New Yorker would actually go to — the kind of stuff you'd hear about from a friend, a neighborhood Instagram, or a Nonsense NYC email.\n\nSOURCE DIVERSITY: Do NOT pull most results from Time Out, Eventbrite, or any single aggregator. At most 1 of 6 from any one source. Search direct venue websites, neighborhood blogs (BKlyner, EV Grieve, Gothamist, The Infatuation, Nonsense NYC, Secret NYC), cultural org sites, and venue pages. Prefer the event's own website over a listing page." + avoidClause + "\n\nReturn exactly 6 items. Skip long-running tourist staples (Sleep No More, generic MoMA admission, etc.) unless something special is happening this specific timeframe. Include the url from your search results (event page, ticket page, or venue page) — empty string only if nothing appeared. Respond ONLY with a raw JSON array, no markdown: [{\"name\":\"...\",\"desc\":\"One sentence — what makes it worth going\",\"area\":\"Neighborhood\",\"cat\":\"Category\",\"cost\":\"Price or Free\",\"emoji\":\"...\",\"url\":\"https://... or empty string\"}]";
 
     try {
       const resp = await fetch(API_URL, {
@@ -146,6 +156,7 @@ export default function DiscoverScreen() {
         body: JSON.stringify({
           model: "claude-haiku-4-5-20251001",
           max_tokens: 1800,
+          system: "You are a hyper-local NYC events concierge — the friend who always knows what's happening. You read Nonsense NYC, follow venue Instagram stories, check community boards, and know the difference between tourist traps and actual local gems. You respond ONLY with a valid JSON array. Never explain, apologize, or add prose. If web search doesn't find specific events, draw on your knowledge of recurring NYC staples at specific venues (comedy at Union Hall, jazz at Smalls, DJs at Nowadays, readings at McNally Jackson, etc.). Always return exactly 6 items.",
           tools: [{ type: "web_search_20250305", name: "web_search" }],
           messages: [{ role: "user", content: prompt }],
         }),
@@ -169,7 +180,7 @@ export default function DiscoverScreen() {
       if (match) {
         try {
           const parsed = JSON.parse(match[0]);
-          setEvents(parsed.slice(0, 8).map((ev) => ({
+          const results = parsed.slice(0, 8).map((ev) => ({
             name: stripCites(ev.name || ""),
             desc: stripCites(ev.desc || ""),
             area: stripCites(ev.area || ""),
@@ -177,7 +188,10 @@ export default function DiscoverScreen() {
             cost: ev.cost || "",
             emoji: ev.emoji || "🎉",
             url: cleanEventUrl(ev.url),
-          })).filter((ev) => ev.name));
+          })).filter((ev) => ev.name);
+          setEvents(results);
+          // Track shown names so next search avoids repeats
+          shownNames.current = [...shownNames.current, ...results.map((ev) => ev.name)].slice(-60);
         } catch (e) {
           console.error("Discover JSON parse error:", e, match[0].slice(0, 300));
           setError("Couldn't read results. Tap retry.");
@@ -270,6 +284,25 @@ export default function DiscoverScreen() {
               window.open("https://www.google.com/search?q=" + encodeURIComponent(ev.name + " NYC " + ev.area + " tickets"), "_blank", "noopener,noreferrer");
             }
           };
+          const shareEvent = (e) => {
+            e.stopPropagation();
+            const lines = [
+              (ev.emoji || "") + " " + ev.name + " — " + ev.area,
+              ev.cost || "",
+              ev.desc,
+              hasUrl ? ev.url : "",
+            ].filter(Boolean).join("\n");
+            if (navigator.share) {
+              navigator.share({ title: ev.name, text: lines, url: hasUrl ? ev.url : undefined }).catch(() => {});
+            } else {
+              navigator.clipboard.writeText(lines).then(() => {
+                const btn = e.currentTarget;
+                const orig = btn.textContent;
+                btn.textContent = "✓ Copied";
+                setTimeout(() => { btn.textContent = orig; }, 1500);
+              }).catch(() => {});
+            }
+          };
           return (
             <div
               key={ev.name + '-' + i}
@@ -285,13 +318,20 @@ export default function DiscoverScreen() {
                 <div style={{ flex: 1 }}>
                   <div style={{ fontFamily: sans, fontSize: "15px", color: P.text, fontWeight: "600", marginBottom: "4px" }}>{ev.name}</div>
                   <div style={{ fontFamily: sans, fontSize: "13px", color: P.textDim, lineHeight: 1.5, marginBottom: "6px" }}>{ev.desc}</div>
-                  <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                  <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
                     <span style={{ fontSize: "11px", fontFamily: sans, color: P.accent }}>📍 {ev.area}</span>
                     {ev.cost && <span style={{ fontSize: "11px", fontFamily: sans, color: P.textDim }}>💰 {ev.cost}</span>}
                     <span style={{ fontSize: "11px", fontFamily: sans, color: P.textDim }}>{ev.cat}</span>
                   </div>
                 </div>
-                <span style={{ fontSize: "12px", color: P.gold, fontFamily: sans, flexShrink: 0 }}>{hasUrl ? "View ↗" : "Search ↗"}</span>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "8px", flexShrink: 0 }}>
+                  <span style={{ fontSize: "12px", color: P.gold, fontFamily: sans }}>{hasUrl ? "View ↗" : "Search ↗"}</span>
+                  <button
+                    onClick={shareEvent}
+                    aria-label={"Share " + ev.name}
+                    style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "8px", padding: "4px 10px", fontSize: "11px", color: P.textDim, fontFamily: sans, cursor: "pointer", transition: "all 0.15s" }}
+                  >📤 Share</button>
+                </div>
               </div>
             </div>
           );
