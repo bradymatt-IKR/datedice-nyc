@@ -7,6 +7,27 @@ import Btn from './Btn.jsx';
 const TIMEFRAMES = ["tonight", "this week", "this weekend", "next week"];
 const DISCOVER_EMOJI = ["🗽", "🎭", "🎶", "🎨", "🌃", "🎪", "🎷", "🏙"];
 
+const CATEGORIES = [
+  { id: "music", label: "Live Music", emoji: "🎶" },
+  { id: "theater", label: "Theater & Shows", emoji: "🎭" },
+  { id: "museum", label: "Museums & Art", emoji: "🎨" },
+  { id: "food", label: "Food & Drink", emoji: "🍷" },
+  { id: "comedy", label: "Comedy", emoji: "😂" },
+  { id: "nightlife", label: "Nightlife", emoji: "🌃" },
+  { id: "outdoor", label: "Outdoors", emoji: "🌳" },
+  { id: "popup", label: "Pop-ups & Markets", emoji: "🛍" },
+];
+
+// Variety prompts — rotated each search to push for different results
+const VARIETY_HINTS = [
+  "Focus on lesser-known, off-the-beaten-path events — avoid the most obvious tourist picks.",
+  "Prioritize unique, one-time-only events and limited-run experiences over permanent attractions.",
+  "Lean toward neighborhood gems and local favorites rather than big-name Broadway or museum staples.",
+  "Emphasize new openings, recently launched exhibits, and events that started in the last month.",
+  "Highlight free or low-cost events, community gatherings, and hidden cultural experiences.",
+  "Focus on immersive, interactive, or participatory events — not just things to watch.",
+];
+
 // Blocked spam/SEO/redirect domains that appear in web search results
 const BLOCKED_DOMAINS = [
   "searchhounds.com", "addoor.co", "clicktracker.com", "trovit.com",
@@ -72,8 +93,10 @@ export default function DiscoverScreen() {
   const [searched, setSearched] = useState(false);
   const [error, setError] = useState(null);
   const [query, setQuery] = useState("tonight");
+  const [category, setCategory] = useState(null);
   const [loadingMsg, setLoadingMsg] = useState(LOADING_MESSAGES[0]);
   const [loadingEmoji, setLoadingEmoji] = useState(DISCOVER_EMOJI[0]);
+  const searchCount = useRef(0);
   const msgInterval = useRef(null);
   const abortRef = useRef(null);
 
@@ -102,6 +125,20 @@ export default function DiscoverScreen() {
     setLoading(true);
     setSearched(true);
     setError(null);
+
+    // Rotate variety hint each search to bust cache and push for diverse results
+    const varietyHint = VARIETY_HINTS[searchCount.current % VARIETY_HINTS.length];
+    searchCount.current++;
+
+    // Build category-aware prompt
+    const catInfo = category ? CATEGORIES.find((c) => c.id === category) : null;
+    const catClause = catInfo
+      ? "Focus specifically on " + catInfo.label.toLowerCase() + " events. All 6 results should be " + catInfo.label.toLowerCase() + " or closely related."
+      : "Include a diverse mix: theater/shows, museum exhibits, live music, food events, comedy, and seasonal events for " + getSeason() + ".";
+
+    // Timestamp makes each request unique to prevent server-side caching
+    const prompt = "Today is " + formatDate(new Date()) + " (search ID: " + Date.now() + "). Search the web for NYC events and list exactly 6 specific events, shows, exhibits, performances, or experiences happening " + query + " (" + getDateRangeLabel(query) + "). " + catClause + " " + varietyHint + " You MUST return exactly 6 items. Do NOT repeat popular staples like Sleep No More, MoMA general admission, or long-running Broadway shows unless they have something special happening this specific timeframe. For each event, include the url field with the best matching webpage from your search results (event page, ticket page, or venue page). Use empty string ONLY if no relevant page appeared in results. Respond ONLY with a raw JSON array, no markdown, no backticks: [{\"name\":\"...\",\"desc\":\"One sentence description\",\"area\":\"Neighborhood\",\"cat\":\"Category\",\"cost\":\"Price or Free\",\"emoji\":\"...\",\"url\":\"https://... or empty string\"}]";
+
     try {
       const resp = await fetch(API_URL, {
         method: "POST",
@@ -109,12 +146,9 @@ export default function DiscoverScreen() {
         signal: controller.signal,
         body: JSON.stringify({
           model: "claude-haiku-4-5-20251001",
-          max_tokens: 1500,
+          max_tokens: 1800,
           tools: [{ type: "web_search_20250305", name: "web_search" }],
-          messages: [{
-            role: "user",
-            content: "Today is " + formatDate(new Date()) + ". Search the web for NYC events and list exactly 5 specific events, shows, exhibits, performances, or experiences happening " + query + " (" + getDateRangeLabel(query) + "). Include a mix: theater/shows, museum exhibits, live music, and seasonal events for " + getSeason() + ". You MUST return exactly 5 items. For each event, include the url field with the best matching webpage from your search results (event page, ticket page, or venue page). Use empty string ONLY if no relevant page appeared in results. Respond ONLY with a raw JSON array, no markdown, no backticks: [{\"name\":\"...\",\"desc\":\"One sentence description\",\"area\":\"Neighborhood\",\"cat\":\"Category\",\"cost\":\"Price or Free\",\"emoji\":\"...\",\"url\":\"https://... or empty string\"}]",
-          }],
+          messages: [{ role: "user", content: prompt }],
         }),
       });
       clearTimeout(timeout);
@@ -136,7 +170,7 @@ export default function DiscoverScreen() {
       if (match) {
         try {
           const parsed = JSON.parse(match[0]);
-          setEvents(parsed.slice(0, 6).map((ev) => ({
+          setEvents(parsed.slice(0, 8).map((ev) => ({
             name: stripCites(ev.name || ""),
             desc: stripCites(ev.desc || ""),
             area: stripCites(ev.area || ""),
@@ -184,6 +218,27 @@ export default function DiscoverScreen() {
         ))}
       </div>
       {query && <p style={{ fontSize: "11px", color: P.textDim, margin: "-12px 0 16px", fontFamily: sans }}>{getDateRangeLabel(query)}</p>}
+      <div style={{ marginBottom: "16px" }}>
+        <p style={{ fontSize: "11px", color: P.textDim, fontFamily: sans, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "8px" }}>🎯 Category {category && <span style={{ color: P.gold, cursor: "pointer", textTransform: "none", letterSpacing: 0 }} onClick={() => setCategory(null)}>(clear)</span>}</p>
+        <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+          {CATEGORIES.map((c) => (
+            <button
+              key={c.id}
+              onClick={() => setCategory(category === c.id ? null : c.id)}
+              aria-pressed={category === c.id}
+              style={{
+                background: category === c.id ? P.goldDim : P.card,
+                border: "1px solid " + (category === c.id ? "rgba(232,195,106,0.3)" : P.border),
+                borderRadius: "20px", padding: "6px 12px", fontSize: "12px", fontFamily: sans,
+                color: category === c.id ? P.gold : P.textDim, cursor: "pointer",
+                transition: "all 0.15s ease",
+              }}
+            >
+              {c.emoji} {c.label}
+            </button>
+          ))}
+        </div>
+      </div>
       <Btn primary onClick={searchEvents} disabled={loading} style={{ width: "100%", marginBottom: "20px" }}>{loading ? "Searching NYC..." : "🔍 Find Events"}</Btn>
       {loading && (
         <div>
@@ -192,7 +247,7 @@ export default function DiscoverScreen() {
             <p style={{ color: P.textDim, fontFamily: sans, fontSize: "14px", transition: "opacity 0.3s" }}>{loadingMsg}</p>
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-            {[0, 0.1, 0.2, 0.3, 0.4].map((d, i) => <SkeletonCard key={i} delay={d} />)}
+            {[0, 0.1, 0.2, 0.3, 0.4, 0.5].map((d, i) => <SkeletonCard key={i} delay={d} />)}
           </div>
         </div>
       )}
