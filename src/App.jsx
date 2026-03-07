@@ -453,24 +453,25 @@ export default function App() {
               {/* Neighborhood with borough-colored dots + Near Me */}
               <div style={{ marginBottom: "22px" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
-                  <button onClick={() => setShowNeighborhoods(!showNeighborhoods)} aria-expanded={showNeighborhoods} aria-controls="neighborhood-list" style={{ background: "none", border: "none", padding: 0, cursor: "pointer", display: "flex", alignItems: "center", gap: "6px", flex: 1 }}>
+                  <button onClick={() => setShowNeighborhoods(!showNeighborhoods)} aria-expanded={showNeighborhoods} aria-controls="neighborhood-list" style={{ background: "none", border: "none", padding: 0, cursor: "pointer", display: "flex", alignItems: "center", gap: "6px" }}>
                     <span style={{ fontSize: "12px", color: "rgba(240,236,226,0.7)", textTransform: "uppercase", letterSpacing: "0.15em", fontFamily: sans }}>📍 Neighborhood</span>
                     {filters.neighborhood?.length > 0 && <span style={{ fontSize: "12px", color: P.gold, fontFamily: sans }}>· {filters.neighborhood.length === 1 ? filters.neighborhood[0] : filters.neighborhood.length + " selected"}</span>}
-                    <span style={{ fontSize: "10px", color: P.textDim, marginLeft: "auto" }} aria-hidden="true">{showNeighborhoods ? "▴" : "▾"}</span>
+                    <span style={{ fontSize: "10px", color: P.textDim }} aria-hidden="true">{showNeighborhoods ? "▴" : "▾"}</span>
                   </button>
+                  <Chip small active={nearMeActive} onClick={async (e) => {
+                    e.stopPropagation();
+                    if (nearMeActive) { setNearMeActive(false); return; }
+                    if (userLocation) { setNearMeActive(true); showToast("📍 Near you in " + (userLocation.borough || "NYC")); return; }
+                    try {
+                      const loc = await requestLocation();
+                      setUserLocation(loc);
+                      setNearMeActive(true);
+                      showToast("📍 Located in " + (loc.borough || "NYC"));
+                    } catch (err) {
+                      showToast("📍 Location unavailable — pick a neighborhood instead");
+                    }
+                  }} style={{ marginLeft: "auto" }}>📍 Near Me{nearMeActive && userLocation?.borough ? " · " + userLocation.borough : ""}</Chip>
                 </div>
-                <Chip small active={nearMeActive} onClick={async () => {
-                  if (nearMeActive) { setNearMeActive(false); return; }
-                  if (userLocation) { setNearMeActive(true); showToast("📍 Near you in " + (userLocation.borough || "NYC")); return; }
-                  try {
-                    const loc = await requestLocation();
-                    setUserLocation(loc);
-                    setNearMeActive(true);
-                    showToast("📍 Located in " + (loc.borough || "NYC"));
-                  } catch (err) {
-                    showToast("📍 Location unavailable — pick a neighborhood instead");
-                  }
-                }} style={{ marginBottom: "8px" }}>📍 Near Me{nearMeActive && userLocation?.borough ? " · " + userLocation.borough : ""}</Chip>
                 {showNeighborhoods && (
                   <div id="neighborhood-list">
                     {filters.neighborhood?.length > 0 && <div style={{ marginBottom: "8px" }}><Chip small active onClick={() => setFilters((f) => { const n = { ...f }; delete n.neighborhood; return n; })}>✕ Clear All ({filters.neighborhood.length})</Chip></div>}
