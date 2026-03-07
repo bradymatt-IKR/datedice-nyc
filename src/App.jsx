@@ -5,6 +5,7 @@ import { WMO, classifyWeather, weatherToFilter } from './utils/weather.js';
 import { loadData, saveData } from './utils/storage.js';
 import { fetchSuggestion, fetchSuggestionStream } from './utils/api.js';
 import { getCachedLocation, requestLocation } from './utils/geo.js';
+import { applySkyPhase, getSeasonalFallback } from './utils/skyPhase.js';
 
 import Btn from './components/Btn.jsx';
 import Chip from './components/Chip.jsx';
@@ -67,6 +68,7 @@ export default function App() {
   const usedNamesRef = useRef(usedNames);
   const loadingInterval = useRef(null);
   const toastTimer = useRef(null);
+  const sunTimesRef = useRef(null);
 
   useEffect(() => { filtersRef.current = filters; }, [filters]);
   useEffect(() => { usedNamesRef.current = usedNames; }, [usedNames]);
@@ -83,7 +85,7 @@ export default function App() {
       try {
         const lat = userLocation?.lat || 40.6782;
         const lng = userLocation?.lng || -73.9442;
-        const r = await fetch("https://api.open-meteo.com/v1/forecast?latitude=" + lat + "&longitude=" + lng + "&current=temperature_2m,apparent_temperature,weather_code,relative_humidity_2m,wind_speed_10m,uv_index&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=America/New_York");
+        const r = await fetch("https://api.open-meteo.com/v1/forecast?latitude=" + lat + "&longitude=" + lng + "&current=temperature_2m,apparent_temperature,weather_code,relative_humidity_2m,wind_speed_10m,uv_index&daily=sunrise,sunset&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=America/New_York");
         const d = await r.json();
         const c = d.current;
         const wmo = WMO[c.weather_code] || WMO[0];
@@ -91,10 +93,31 @@ export default function App() {
         const autoFilter = weatherToFilter(classification);
         setWeather({ tempF: Math.round(c.temperature_2m), feelsF: Math.round(c.apparent_temperature), humidity: Math.round(c.relative_humidity_2m), windMph: Math.round(c.wind_speed_10m), wmoLabel: wmo.l, wmoIcon: wmo.i, classification, autoFilter });
         setFilters((f) => ({ ...f, weather: autoFilter, timeOfDay: getTimeOfDay() }));
+
+        // Parse sunrise/sunset for sky phase
+        if (d.daily && d.daily.sunrise && d.daily.sunset) {
+          const sr = new Date(d.daily.sunrise[0]);
+          const ss = new Date(d.daily.sunset[0]);
+          const srMin = sr.getHours() * 60 + sr.getMinutes();
+          const ssMin = ss.getHours() * 60 + ss.getMinutes();
+          applySkyPhase(srMin, ssMin);
+          sunTimesRef.current = { sunrise: srMin, sunset: ssMin };
+        }
       } catch (e) { console.error(e); }
       setWeatherLoading(false);
     })();
   }, [userLocation]);
+
+  // ── Sky phase: apply fallback on mount, then re-evaluate every 60s ──
+  useEffect(() => {
+    const fallback = getSeasonalFallback();
+    applySkyPhase(fallback.sunrise, fallback.sunset);
+    const id = setInterval(() => {
+      const times = sunTimesRef.current || getSeasonalFallback();
+      applySkyPhase(times.sunrise, times.sunset);
+    }, 60_000);
+    return () => clearInterval(id);
+  }, []);
 
   useEffect(() => {
     return () => { if (diceInterval.current) clearInterval(diceInterval.current); };
@@ -307,11 +330,20 @@ export default function App() {
 
   // ── Native share with clipboard fallback ──
   const sharePlan = (item) => {
-    const text = "🎲 Date Dice picked:\n\n" + (item.emoji || "🎲") + " " + item.name + "\n📍 " + item.area + (item.address && item.address !== item.area ? "\n📫 " + item.address : "") + "\n\n" + item.desc + (item.tip ? "\n\n💡 " + item.tip : "") + "\n\nLet's do this! 💛";
+    const booking = item.bookingUrl && item.bookingUrl.startsWith("http") ? item.bookingUrl : null;
+    const meta = [item.cuisine, item.priceRange].filter(Boolean).join(" · ");
+    const addr = item.address && item.address !== item.area ? item.address : item.area;
+    const lines = [
+      (item.emoji || "") + " " + item.name + " — " + item.area,
+      [addr !== item.area ? addr : "", meta].filter(Boolean).join(" · "),
+      item.desc,
+      item.tip ? "Tip: " + item.tip : "",
+      booking || "",
+    ].filter(Boolean).join("\n");
     if (navigator.share) {
-      navigator.share({ title: "Date Dice: " + item.name, text }).catch(() => {});
+      navigator.share({ title: item.name, text: lines, url: booking || undefined }).catch(() => {});
     } else {
-      navigator.clipboard.writeText(text).then(() => showToast("📋 Copied to clipboard!")).catch(() => showToast("Couldn't copy — try long-press"));
+      navigator.clipboard.writeText(lines).then(() => showToast("📋 Copied to clipboard!")).catch(() => showToast("Couldn't copy — try long-press"));
     }
   };
 

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Date Dice uses your location to find nearby date spots and show local weather.</string>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>Date Dice can add date night plans to your calendar so you don't forget.</string>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>comgooglemaps</string>
+		<string>waze</string>
+		<string>citymapper</string>
+	</array>
+</dict>
+</plist>

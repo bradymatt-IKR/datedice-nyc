@@ -3,20 +3,20 @@ import { P, sans } from '../data/constants.js';
 
 const STEPS = [
   {
-    title: "Set Your Filters",
-    desc: "Pick a vibe, budget, borough — or skip them all for a total surprise.",
+    title: "Set the Scene",
+    desc: "Pick a vibe, budget, and neighborhood — or tap Dealer's Choice for a total surprise.",
     animClass: "onboardFilterPop",
-    icons: ["🌃", "💰", "📍", "🍽"],
+    icons: ["✨", "💰", "📍", "🍽"],
   },
   {
     title: "Roll the Dice",
-    desc: "Tap the button (or shake your phone!) and we'll search NYC for the perfect spot.",
+    desc: "Tap the dice and AI scours NYC for the perfect spot — with insider tips and booking links.",
     animClass: "onboardDiceBounce",
     icons: ["🎲"],
   },
   {
     title: "Lock It In",
-    desc: "Love the pick? Lock it in, share with your date, and get directions.",
+    desc: "Love the pick? Lock it in, share with your date, and track your date history.",
     animClass: "onboardLockClick",
     icons: ["🔒"],
   },
