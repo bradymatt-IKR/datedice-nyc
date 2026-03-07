@@ -21,8 +21,8 @@ struct ResultCardView: View {
                         .foregroundColor(Theme.gold)
 
                     HStack(spacing: 8) {
-                        if let area = suggestion.area, !area.isEmpty {
-                            Text(area)
+                                    if !suggestion.area.isEmpty {
+                            Text(suggestion.area)
                                 .font(.system(size: 13))
                                 .foregroundColor(Theme.textSecondary)
                         }
@@ -51,13 +51,13 @@ struct ResultCardView: View {
                 .lineSpacing(4)
 
             // Address
-            if let address = suggestion.address, !address.isEmpty {
+            if !suggestion.address.isEmpty {
                 HStack(spacing: 8) {
                     Image(systemName: "mappin.circle.fill")
                         .font(.system(size: 14))
                         .foregroundColor(Theme.rose)
 
-                    Text(address)
+                    Text(suggestion.address)
                         .font(.system(size: 13))
                         .foregroundColor(Theme.textSecondary)
                 }
@@ -95,7 +95,7 @@ struct ResultCardView: View {
                         .padding(.horizontal, 16)
                         .padding(.vertical, 10)
                         .background(Theme.gradient)
-                        .capsule()
+                        .clipShape(Capsule())
                     }
                 }
 
@@ -147,15 +147,15 @@ struct SafariView: UIViewControllerRepresentable {
 #Preview {
     ResultCardView(
         suggestion: Suggestion(
-            id: "1",
             name: "Balthazar",
-            emoji: "🍽️",
-            desc: "A timeless French brasserie in SoHo with classic bistro fare and an elegant atmosphere perfect for romantic dinners.",
+            desc: "A timeless French brasserie in SoHo with classic bistro fare.",
             area: "SoHo",
+            address: "80 Spring St, New York, NY 10012",
+            cat: "Food & Drink",
             priceRange: "$$",
             cuisine: "French",
-            address: "80 Spring St, New York, NY 10012",
-            tip: "Request a table by the window for prime people-watching on Spring Street.",
+            emoji: "🍽️",
+            tip: "Request a table by the window.",
             bookingUrl: "https://www.resy.com",
             bookingPlatform: "Resy"
         ),

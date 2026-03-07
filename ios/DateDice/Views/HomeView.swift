@@ -106,18 +106,24 @@ struct HomeView: View {
                     }
                     .buttonStyle(.plain)
 
-                    // MARK: - Dice
-                    DiceView(isRolling: $vm.isRolling) {
-                        Task {
-                            await vm.roll()
+                    // MARK: - Dice + Hint/Loading
+                    VStack(spacing: 2) {
+                        DiceView(isRolling: $vm.isRolling) {
+                            Task {
+                                await vm.roll()
+                            }
+                        }
+
+                        if vm.isRolling {
+                            InlineLoadingView(message: vm.loadingMessage)
+                                .transition(.opacity)
+                        } else {
+                            Text("Tap the dice to roll")
+                                .font(.system(size: 13))
+                                .foregroundStyle(Theme.textSecondary)
                         }
                     }
-                    .padding(.vertical, 20)
-
-                    // MARK: - Hint Text
-                    Text("Tap the dice to roll")
-                        .font(.system(size: 13))
-                        .foregroundStyle(Theme.textSecondary)
+                    .padding(.vertical, 4)
 
                     // MARK: - Result
                     if vm.showResult, let result = vm.currentResult {
@@ -156,12 +162,6 @@ struct HomeView: View {
                 }
             }
             .scrollIndicators(.hidden)
-
-            // MARK: - Loading Overlay
-            if vm.isRolling {
-                LoadingOverlay(message: vm.loadingMessage)
-                    .transition(.opacity)
-            }
 
             // MARK: - Toast
             if let toast = vm.toastMessage {
