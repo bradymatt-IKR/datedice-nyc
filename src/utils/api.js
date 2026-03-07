@@ -17,22 +17,32 @@ export function cleanResult(obj) {
   return out;
 }
 
+function toStr(val, fallback) {
+  if (Array.isArray(val) && val.length > 0) return val.join(", ");
+  return val || fallback;
+}
+
 function buildPrompt(type, filters, usedNames, variation) {
-  const { timeOfDay, weather, vibe, budget, duration, neighborhood, cuisine, activityType } = filters;
+  const { timeOfDay, weather, vibe, budget, duration, neighborhood, cuisine, activityType, nearMe, _recentCategories } = filters;
   const season = getSeason();
   const today = formatDate(new Date());
-  const avoidList = (usedNames || []).slice(-40).join(", ");
+  const avoidList = (usedNames || []).slice(-80).join(", ");
   const neighborhoodStr = Array.isArray(neighborhood) && neighborhood.length > 0 ? neighborhood.join(", ") : (neighborhood || "anywhere in NYC or nearby");
-  const variationHint = variation ? "\nImportant: Pick a DIFFERENT and UNIQUE option — variation #" + variation + ". Do NOT repeat any previously suggested place." : "";
+  const vibeStr = toStr(vibe, "any");
+  const cuisineStr = toStr(cuisine, "any cuisine — surprise us");
+  const nearMeStr = nearMe ? "\n- User's approximate location: " + nearMe.lat.toFixed(3) + ", " + nearMe.lng.toFixed(3) + (nearMe.borough ? " (" + nearMe.borough + ")" : "") + ". Prioritize spots within a 15-minute walk or short subway ride." : "";
+  const recentCats = _recentCategories || [];
+  const diversityHint = recentCats.length >= 2 ? "\n- For variety, suggest something DIFFERENT from these recent picks: " + recentCats.slice(-3).join(", ") + ". Go for a different cuisine, style, or vibe." : "";
+  const rollId = Date.now();
+  const variationHint = variation ? "\nImportant: Pick a DIFFERENT and UNIQUE option — variation #" + variation + ", roll " + rollId + ". Do NOT repeat any previously suggested place." : "\nRoll ID: " + rollId + ".";
   const jsonNote = "\n\nRespond with ONLY a raw JSON object — no markdown, no backticks, no extra text." + variationHint;
 
   if (type === "food") {
-    const cuisineStr = cuisine || "any cuisine — surprise us";
-    return "You are a NYC food expert with deep knowledge of every neighborhood's restaurant scene. Suggest ONE specific real, currently-operating restaurant, bar, café, or food experience matching:\n- Neighborhood: " + neighborhoodStr + "\n- Cuisine: " + cuisineStr + "\n- Time: " + (timeOfDay || "any") + "\n- Weather: " + (weather || "any") + " (cozy/indoor for cold/rain; outdoor/rooftop for warm/sunny)\n- Vibe: " + (vibe || "any") + "\n- Budget: " + (budget || "any") + " (Free=free events, Under $50=casual, $50-150=mid-range, $150-300=upscale, Splurge=$300+/person)\n- Duration: " + (duration || "any") + "\n- Season: " + season + " · Today: " + today + "\n" + (avoidList ? "Do NOT suggest: " + avoidList + "\n" : "") + "\n- For bookingUrl: ONLY use a URL that appeared in your web search results. Copy the exact URL from search results — do NOT guess, construct, or fabricate URLs. Use empty string if no relevant booking page appeared in results or if walk-in only." + jsonNote + '\n{"name":"...","desc":"One vivid sentence — what makes it special and what to order","area":"Neighborhood","address":"Full street address","cat":"Food & Drink","priceRange":"$/$$/$$$/$$$$","cuisine":"type","emoji":"🍽","tip":"One insider tip","bookingUrl":"exact URL from search results or empty string","bookingPlatform":"Resy|OpenTable|Tock|Website|WalkIn"}';
+    return "You are a NYC food expert with deep knowledge of every neighborhood's restaurant scene. Suggest ONE specific real, currently-operating restaurant, bar, café, or food experience matching:\n- Neighborhood: " + neighborhoodStr + nearMeStr + "\n- Cuisine: " + cuisineStr + "\n- Time: " + (timeOfDay || "any") + "\n- Weather: " + (weather || "any") + " (cozy/indoor for cold/rain; outdoor/rooftop for warm/sunny)\n- Vibe: " + vibeStr + "\n- Budget: " + (budget || "any") + " (Free=free events, Under $50=casual, $50-150=mid-range, $150-300=upscale, Splurge=$300+/person)\n- Duration: " + (duration || "any") + "\n- Season: " + season + " · Today: " + today + diversityHint + "\n" + (avoidList ? "Do NOT suggest: " + avoidList + "\n" : "") + "\n- For bookingUrl: ONLY use a URL that appeared in your web search results. Copy the exact URL from search results — do NOT guess, construct, or fabricate URLs. Use empty string if no relevant booking page appeared in results or if walk-in only." + jsonNote + '\n{"name":"...","desc":"One vivid sentence — what makes it special and what to order","area":"Neighborhood","address":"Full street address","cat":"Food & Drink","priceRange":"$/$$/$$$/$$$$","cuisine":"type","emoji":"🍽","tip":"One insider tip","bookingUrl":"exact URL from search results or empty string","bookingPlatform":"Resy|OpenTable|Tock|Website|WalkIn"}';
   }
 
   const actTypeStr = activityType || "any activity or experience";
-  return "You are a NYC experiences expert with deep knowledge of museums, shows, parks, events, classes, and hidden gems. Suggest ONE specific real, currently-available experience matching:\n- Type: " + actTypeStr + "\n- Neighborhood: " + neighborhoodStr + "\n- Time: " + (timeOfDay || "any") + "\n- Weather: " + (weather || "any") + " (indoor for rain/cold; outdoor for sunny)\n- Vibe: " + (vibe || "any") + "\n- Budget: " + (budget || "any") + " (Free, Under $50, $50-150, $150-300, Splurge=$300+)\n- Duration: " + (duration || "any") + "\n- Season: " + season + " · Today: " + today + "\n" + (avoidList ? "Do NOT suggest: " + avoidList + "\n" : "") + "\n- For bookingUrl: ONLY use a URL that appeared in your web search results. Copy the exact URL from search results — do NOT guess, construct, or fabricate URLs. Use empty string if no relevant booking page appeared in results or if free/no-booking." + jsonNote + '\n{"name":"...","desc":"One vivid sentence — what makes it special and why it\'s great for a date","area":"Neighborhood or location","address":"Address or general area","cat":"Activity","emoji":"✨","tip":"One insider tip","bookingUrl":"exact URL from search results or empty string","bookingPlatform":"Eventbrite|Website|Ticketmaster|NoReservation"}';
+  return "You are a NYC experiences expert with deep knowledge of museums, shows, parks, events, classes, and hidden gems. Suggest ONE specific real, currently-available experience matching:\n- Type: " + actTypeStr + "\n- Neighborhood: " + neighborhoodStr + nearMeStr + "\n- Time: " + (timeOfDay || "any") + "\n- Weather: " + (weather || "any") + " (indoor for rain/cold; outdoor for sunny)\n- Vibe: " + vibeStr + "\n- Budget: " + (budget || "any") + " (Free, Under $50, $50-150, $150-300, Splurge=$300+)\n- Duration: " + (duration || "any") + "\n- Season: " + season + " · Today: " + today + diversityHint + "\n" + (avoidList ? "Do NOT suggest: " + avoidList + "\n" : "") + "\n- For bookingUrl: ONLY use a URL that appeared in your web search results. Copy the exact URL from search results — do NOT guess, construct, or fabricate URLs. Use empty string if no relevant booking page appeared in results or if free/no-booking." + jsonNote + '\n{"name":"...","desc":"One vivid sentence — what makes it special and why it\'s great for a date","area":"Neighborhood or location","address":"Address or general area","cat":"Activity","emoji":"✨","tip":"One insider tip","bookingUrl":"exact URL from search results or empty string","bookingPlatform":"Eventbrite|Website|Ticketmaster|NoReservation"}';
 }
 
 function parseResponse(data) {
@@ -51,8 +61,8 @@ function parseResponse(data) {
 }
 
 // ── Streaming fetch ──
-export async function fetchSuggestionStream(type, filters, usedNames, onText) {
-  const prompt = buildPrompt(type, filters, usedNames);
+export async function fetchSuggestionStream(type, filters, usedNames, { onText, variation } = {}) {
+  const prompt = buildPrompt(type, filters, usedNames, variation);
   try {
     const resp = await fetch(STREAM_URL, {
       method: "POST",

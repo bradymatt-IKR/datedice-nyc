@@ -4,6 +4,7 @@ import { formatDate, getTimeOfDay, getSeason } from './utils/date.js';
 import { WMO, classifyWeather, weatherToFilter } from './utils/weather.js';
 import { loadData, saveData } from './utils/storage.js';
 import { fetchSuggestion, fetchSuggestionStream } from './utils/api.js';
+import { getCachedLocation, requestLocation } from './utils/geo.js';
 
 import Btn from './components/Btn.jsx';
 import Chip from './components/Chip.jsx';
@@ -54,6 +55,9 @@ export default function App() {
   const [loadingEmoji, setLoadingEmoji] = useState("🎲");
   const [loadingFade, setLoadingFade] = useState(1);
   const [tabKey, setTabKey] = useState(0);
+  const [recentCategories, setRecentCategories] = useState([]);
+  const [userLocation, setUserLocation] = useState(null);
+  const [nearMeActive, setNearMeActive] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(() => {
     try { return !localStorage.getItem("datedice:onboarded"); } catch { return false; }
   });
@@ -70,12 +74,16 @@ export default function App() {
   useEffect(() => {
     setHistory(loadData("datedice:history", []));
     setUsedNames(loadData("datedice:used", []));
+    const cached = getCachedLocation();
+    if (cached) { setUserLocation(cached); setNearMeActive(true); }
   }, []);
 
   useEffect(() => {
     (async () => {
       try {
-        const r = await fetch("https://api.open-meteo.com/v1/forecast?latitude=40.6782&longitude=-73.9442&current=temperature_2m,apparent_temperature,weather_code,relative_humidity_2m,wind_speed_10m,uv_index&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=America/New_York");
+        const lat = userLocation?.lat || 40.6782;
+        const lng = userLocation?.lng || -73.9442;
+        const r = await fetch("https://api.open-meteo.com/v1/forecast?latitude=" + lat + "&longitude=" + lng + "&current=temperature_2m,apparent_temperature,weather_code,relative_humidity_2m,wind_speed_10m,uv_index&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=America/New_York");
         const d = await r.json();
         const c = d.current;
         const wmo = WMO[c.weather_code] || WMO[0];
@@ -86,7 +94,7 @@ export default function App() {
       } catch (e) { console.error(e); }
       setWeatherLoading(false);
     })();
-  }, []);
+  }, [userLocation]);
 
   useEffect(() => {
     return () => { if (diceInterval.current) clearInterval(diceInterval.current); };
@@ -189,21 +197,35 @@ export default function App() {
     }
 
     const cat = currentFilters.category || "Surprise Me";
-    const type = cat === "Food & Drink" ? "food" : cat === "Activities" ? "activity" : Math.random() > 0.45 ? "food" : "activity";
+    let type;
+    if (cat === "Food & Drink") { type = "food"; }
+    else if (cat === "Activities") { type = "activity"; }
+    else {
+      // "Surprise Me" — balance food vs activity based on recent results
+      const recentTypes = recentCategories.slice(-3).map((c) =>
+        ["Food & Drink", "food", "restaurant", "cafe", "bar"].some((t) => (c || "").toLowerCase().includes(t)) ? "food" : "activity"
+      );
+      const foodCount = recentTypes.filter((t) => t === "food").length;
+      const foodProb = foodCount >= 3 ? 0.2 : foodCount === 0 ? 0.8 : 0.55;
+      type = Math.random() < foodProb ? "food" : "activity";
+    }
+
+    // Inject diversity context + location into filters for buildPrompt
+    const enrichedFilters = { ...currentFilters, _recentCategories: recentCategories, ...(nearMeActive && userLocation ? { nearMe: userLocation } : {}) };
 
     let res = null;
     try {
-      res = await fetchSuggestionStream(type, currentFilters, currentUsed);
+      res = await fetchSuggestionStream(type, enrichedFilters, currentUsed);
       if (!res) {
         // Wait before fallback so rate-limit window has time to clear
         await new Promise((r) => setTimeout(r, 2000));
         if (rollCount.current !== myRoll) return;
-        res = await fetchSuggestion(type, currentFilters, currentUsed);
+        res = await fetchSuggestion(type, enrichedFilters, currentUsed);
       }
       if (!res) {
         await new Promise((r) => setTimeout(r, 3000));
         if (rollCount.current !== myRoll) return;
-        res = await fetchSuggestion(type, currentFilters, currentUsed);
+        res = await fetchSuggestion(type, enrichedFilters, currentUsed);
       }
     } catch (err) {
       console.error("doRoll:", err);
@@ -212,20 +234,21 @@ export default function App() {
     if (rollCount.current !== myRoll) return;
     stopDice();
     setRolling(false);
-   
+
     if (res && res.name) {
       const newUsed = currentUsed.concat([res.name]);
       usedNamesRef.current = newUsed;
       setUsedNames(newUsed);
       saveData("datedice:used", newUsed.slice(-200));
       setResult(res);
+      setRecentCategories((prev) => [...prev.slice(-4), res.cuisine || res.cat || type]);
       haptic([80]); // firm tap on result
       setShowConfetti(true);
       setTimeout(() => setShowConfetti(false), 2500);
     } else {
       setResult({ name: "Nothing came back", desc: "The search didn't return a result — tap Re-roll to try again!", emoji: "🎲", cat: "Try Again", area: "NYC" });
     }
-  }, []);
+  }, [recentCategories, nearMeActive, userLocation]);
 
   const loadAlt = useCallback(async () => {
     if (rolling) return;
@@ -237,12 +260,13 @@ export default function App() {
     if (cat === "Food & Drink") type = "food";
     else if (cat === "Activities") type = "activity";
     else type = Math.random() > 0.45 ? "food" : "activity";
+    const enrichedFilters = { ...currentFilters, _recentCategories: recentCategories, ...(nearMeActive && userLocation ? { nearMe: userLocation } : {}) };
     setAltsLoading(true);
     try {
-      // Use streaming endpoint (same as doRoll) — more reliable than non-streaming
+      // Use streaming endpoint with variation hints for different results
       const results = await Promise.all([
-        fetchSuggestionStream(type, currentFilters, allUsed).catch(() => null),
-        fetchSuggestionStream(type, currentFilters, allUsed).catch(() => null),
+        fetchSuggestionStream(type, enrichedFilters, allUsed, { variation: 1 }).catch(() => null),
+        fetchSuggestionStream(type, enrichedFilters, allUsed, { variation: 2 }).catch(() => null),
       ]);
       if (rollCount.current !== thisRoll) { setAltsLoading(false); return; }
       const newAlts = [];
@@ -264,7 +288,7 @@ export default function App() {
       }
     } catch (e) { if (e && e.name !== "AbortError") console.error("loadAlt:", e); }
     setAltsLoading(false);
-  }, [rolling]);
+  }, [rolling, recentCategories, nearMeActive, userLocation]);
 
   const lockIn = (item) => {
     const entry = { ...item, id: Date.now().toString(), status: "locked", lockedAt: new Date().toISOString(), rating: null };
@@ -334,7 +358,7 @@ export default function App() {
           <h1 className="title-shimmer" style={{ fontSize: "clamp(38px, 8vw, 58px)", fontWeight: "700", letterSpacing: "0.02em", margin: "0 0 8px", background: "linear-gradient(90deg, #e8c36a 0%, #c97d4a 30%, #f5d98a 50%, #c97d4a 70%, #e8c36a 100%)", backgroundSize: "200% auto", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", fontFamily: display, animation: "titleShimmer 6s ease-in-out infinite" }}>Date Dice</h1>
           <p style={{ fontSize: "14px", color: P.textDim, letterSpacing: "0.18em", textTransform: "uppercase", margin: "0 0 8px", fontFamily: sans }}>New York City Edition</p>
           <p style={{ fontSize: "13px", color: P.accent, margin: "0 0 8px", fontFamily: sans }}>📅 {formatDate(new Date())} · {getSeason()}</p>
-          {weather && <p style={{ fontSize: "13px", color: P.textDim, margin: "0 0 6px", fontFamily: sans }}>{weather.wmoIcon} {weather.tempF}°F · {weather.classification} in Brooklyn</p>}
+          {weather && <p style={{ fontSize: "13px", color: P.textDim, margin: "0 0 6px", fontFamily: sans }}>{weather.wmoIcon} {weather.tempF}°F · {weather.classification} in {userLocation?.borough || "Brooklyn"}</p>}
           {history.length > 0 && <p style={{ fontSize: "13px", color: P.textDim, margin: "0 0 6px", fontFamily: sans }}>{history.filter((h) => h.status === "completed").length} dates completed · {history.filter((h) => h.status === "locked").length} upcoming</p>}
           <div style={{ height: "24px" }} />
           <p style={{ fontSize: "17px", lineHeight: 1.7, maxWidth: "400px", color: "rgba(240,236,226,0.6)", margin: "0 0 12px" }}>Set your mood. Roll the dice.<br />Let the city surprise you.</p>
@@ -395,27 +419,58 @@ export default function App() {
               </div>
 
               <WeatherBadge weather={weather} loading={weatherLoading} />
-              {Object.entries(FILTERS_MAIN).map(([key, cfg]) => (
+              {Object.entries(FILTERS_MAIN).map(([key, cfg]) => {
+                const isMulti = cfg.multi;
+                const val = filters[key];
+                const arrVal = isMulti ? (Array.isArray(val) ? val : val ? [val] : []) : null;
+                return (
                 <div key={key} style={{ marginBottom: "22px" }} role="group" aria-labelledby={"filter-" + key}>
                   <div id={"filter-" + key} style={{ fontSize: "12px", color: "rgba(240,236,226,0.7)", textTransform: "uppercase", letterSpacing: "0.15em", marginBottom: "8px", fontFamily: sans }}>
                     <span aria-hidden="true">{cfg.icon}</span> {cfg.label}
+                    {isMulti && arrVal.length > 1 && <span style={{ fontSize: "11px", color: P.gold, marginLeft: "6px", textTransform: "none", letterSpacing: "0" }}>· {arrVal.length} selected</span>}
                     {key === "budget" && <span style={{ color: P.accent, marginLeft: "6px", textTransform: "none", letterSpacing: "0", fontSize: "11px" }}>($150–300 = upscale · Splurge = $300+)</span>}
                   </div>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }} role="listbox" aria-label={cfg.label}>
+                    {isMulti && arrVal.length > 0 && <Chip small active onClick={() => setFilters((f) => { const n = { ...f }; delete n[key]; return n; })}>✕ Clear</Chip>}
                     {cfg.options.map((opt) => (
-                      <Chip key={opt} active={filters[key] === opt} onClick={() => setFilters((f) => { const n = { ...f }; if (n[key] === opt) delete n[key]; else n[key] = opt; return n; })}>{opt}</Chip>
+                      <Chip key={opt} active={isMulti ? arrVal.includes(opt) : val === opt} onClick={() => setFilters((f) => {
+                        const n = { ...f };
+                        if (isMulti) {
+                          const prev = Array.isArray(n[key]) ? n[key] : n[key] ? [n[key]] : [];
+                          const next = prev.includes(opt) ? prev.filter((x) => x !== opt) : [...prev, opt];
+                          if (next.length === 0) delete n[key]; else n[key] = next;
+                        } else {
+                          if (n[key] === opt) delete n[key]; else n[key] = opt;
+                        }
+                        return n;
+                      })}>{opt}</Chip>
                     ))}
                   </div>
                 </div>
-              ))}
+                );
+              })}
 
-              {/* Neighborhood with borough-colored dots */}
+              {/* Neighborhood with borough-colored dots + Near Me */}
               <div style={{ marginBottom: "22px" }}>
-                <button onClick={() => setShowNeighborhoods(!showNeighborhoods)} aria-expanded={showNeighborhoods} aria-controls="neighborhood-list" style={{ background: "none", border: "none", padding: 0, cursor: "pointer", display: "flex", alignItems: "center", gap: "6px", marginBottom: "8px", width: "100%" }}>
-                  <span style={{ fontSize: "12px", color: "rgba(240,236,226,0.7)", textTransform: "uppercase", letterSpacing: "0.15em", fontFamily: sans }}>📍 Neighborhood</span>
-                  {filters.neighborhood?.length > 0 && <span style={{ fontSize: "12px", color: P.gold, fontFamily: sans }}>· {filters.neighborhood.length === 1 ? filters.neighborhood[0] : filters.neighborhood.length + " selected"}</span>}
-                  <span style={{ fontSize: "10px", color: P.textDim, marginLeft: "auto" }} aria-hidden="true">{showNeighborhoods ? "▴" : "▾"}</span>
-                </button>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
+                  <button onClick={() => setShowNeighborhoods(!showNeighborhoods)} aria-expanded={showNeighborhoods} aria-controls="neighborhood-list" style={{ background: "none", border: "none", padding: 0, cursor: "pointer", display: "flex", alignItems: "center", gap: "6px", flex: 1 }}>
+                    <span style={{ fontSize: "12px", color: "rgba(240,236,226,0.7)", textTransform: "uppercase", letterSpacing: "0.15em", fontFamily: sans }}>📍 Neighborhood</span>
+                    {filters.neighborhood?.length > 0 && <span style={{ fontSize: "12px", color: P.gold, fontFamily: sans }}>· {filters.neighborhood.length === 1 ? filters.neighborhood[0] : filters.neighborhood.length + " selected"}</span>}
+                    <span style={{ fontSize: "10px", color: P.textDim, marginLeft: "auto" }} aria-hidden="true">{showNeighborhoods ? "▴" : "▾"}</span>
+                  </button>
+                </div>
+                <Chip small active={nearMeActive} onClick={async () => {
+                  if (nearMeActive) { setNearMeActive(false); return; }
+                  if (userLocation) { setNearMeActive(true); showToast("📍 Near you in " + (userLocation.borough || "NYC")); return; }
+                  try {
+                    const loc = await requestLocation();
+                    setUserLocation(loc);
+                    setNearMeActive(true);
+                    showToast("📍 Located in " + (loc.borough || "NYC"));
+                  } catch (err) {
+                    showToast("📍 Location unavailable — pick a neighborhood instead");
+                  }
+                }} style={{ marginBottom: "8px" }}>📍 Near Me{nearMeActive && userLocation?.borough ? " · " + userLocation.borough : ""}</Chip>
                 {showNeighborhoods && (
                   <div id="neighborhood-list">
                     {filters.neighborhood?.length > 0 && <div style={{ marginBottom: "8px" }}><Chip small active onClick={() => setFilters((f) => { const n = { ...f }; delete n.neighborhood; return n; })}>✕ Clear All ({filters.neighborhood.length})</Chip></div>}
@@ -439,14 +494,23 @@ export default function App() {
                 <div style={{ marginBottom: "22px" }}>
                   <button onClick={() => setShowCuisines(!showCuisines)} aria-expanded={showCuisines} aria-controls="cuisine-list" style={{ background: "none", border: "none", padding: 0, cursor: "pointer", display: "flex", alignItems: "center", gap: "6px", marginBottom: "8px", width: "100%" }}>
                     <span style={{ fontSize: "12px", color: "rgba(240,236,226,0.7)", textTransform: "uppercase", letterSpacing: "0.15em", fontFamily: sans }}>🍽 Cuisine</span>
-                    {filters.cuisine && <span style={{ fontSize: "12px", color: P.gold, fontFamily: sans }}>· {filters.cuisine}</span>}
+                    {(Array.isArray(filters.cuisine) ? filters.cuisine.length > 0 : filters.cuisine) && <span style={{ fontSize: "12px", color: P.gold, fontFamily: sans }}>· {Array.isArray(filters.cuisine) ? (filters.cuisine.length === 1 ? filters.cuisine[0] : filters.cuisine.length + " selected") : filters.cuisine}</span>}
                     <span style={{ fontSize: "10px", color: P.textDim, marginLeft: "auto" }} aria-hidden="true">{showCuisines ? "▴" : "▾"}</span>
                   </button>
                   {showCuisines && (
                     <div id="cuisine-list">
-                      {filters.cuisine && <div style={{ marginBottom: "8px" }}><Chip small active onClick={() => setFilters((f) => { const n = { ...f }; delete n.cuisine; return n; })}>✕ Clear</Chip></div>}
+                      {(Array.isArray(filters.cuisine) ? filters.cuisine.length > 0 : filters.cuisine) && <div style={{ marginBottom: "8px" }}><Chip small active onClick={() => setFilters((f) => { const n = { ...f }; delete n.cuisine; return n; })}>✕ Clear{Array.isArray(filters.cuisine) && filters.cuisine.length > 1 ? ` (${filters.cuisine.length})` : ""}</Chip></div>}
                       <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
-                        {CUISINES.map((c) => <Chip key={c} small active={filters.cuisine === c} onClick={() => setFilters((f) => { const n = { ...f }; if (n.cuisine === c) delete n.cuisine; else n.cuisine = c; return n; })}>{c}</Chip>)}
+                        {CUISINES.map((c) => {
+                          const cuisineArr = Array.isArray(filters.cuisine) ? filters.cuisine : filters.cuisine ? [filters.cuisine] : [];
+                          return <Chip key={c} small active={cuisineArr.includes(c)} onClick={() => setFilters((f) => {
+                            const prev = Array.isArray(f.cuisine) ? f.cuisine : f.cuisine ? [f.cuisine] : [];
+                            const next = prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c];
+                            const n = { ...f };
+                            if (next.length === 0) delete n.cuisine; else n.cuisine = next;
+                            return n;
+                          })}>{c}</Chip>;
+                        })}
                       </div>
                     </div>
                   )}
